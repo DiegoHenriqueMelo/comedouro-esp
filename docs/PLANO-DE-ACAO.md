@@ -1,9 +1,10 @@
 # Dispenser de Ração — Plano de Ação (Protótipo 3: garrafa)
 
-> Projeto pessoal de aprendizado: alimentador automático para 1 gato, com ESP32, uma garrafa PET como reservatório, peças impressas em PETG, interface web local, comando de voz pela Alexa e avisos pelo Telegram.
+> Projeto pessoal de aprendizado: alimentador automático para 1 gato, com ESP32, uma garrafa PET como reservatório, peças impressas em PETG, um servidor próprio com PWA no celular, comando de voz pela Alexa e avisos por notificação.
 > Estrutura inspirada no tutorial [Como fazer um alimentador automático com Arduino](https://www.makerhero.com/blog/alimentador-automatico-com-arduino/), da MakerHero, com a comporta trocada por uma comporta dosadora.
 > Modelo 3D (versão revestida, com balança e sensor de nível): https://claude.ai/artifact/6WYF1TqG1M9dxTngaVKYsh
 > Plano reescrito em 29/10/2026. A versão anterior, com rotor e motor de passo, está em [arquivo/PLANO-DE-ACAO-v1-rotor.md](arquivo/PLANO-DE-ACAO-v1-rotor.md).
+> Desde 30/10/2026, o servidor, o banco e o PWA têm uma trilha própria: [ROTEIRO-SISTEMA.md](ROTEIRO-SISTEMA.md).
 
 ---
 
@@ -34,7 +35,7 @@
 |---|---|---|
 | CAD (OpenSCAD) | Claude | Você revisa, ajusta parâmetros e manda imprimir |
 | Eletrônica e firmware | Você | Claude explica o conceito, você escreve e monta, Claude revisa e destrava |
-| Interface web | Você | Zona de conforto: Claude só revisa |
+| Servidor e interface (PWA) | Você | Mentoria com TDD: Claude explica, define os testes e revisa ([roteiro do sistema](ROTEIRO-SISTEMA.md)) |
 | Repositório público | Você | Só no M10 |
 
 ---
@@ -48,18 +49,20 @@
 | D3 | Atuador | Servo **MG996R de 180°**, 5 V | Sabe a própria posição: sem driver e sem sensor. Engrenagem de metal, com força para cortar um grão preso |
 | D4 | Sensores de segurança | **Balança na tigela** (célula de carga de 5 kg + HX711) e **sensor de nível** na tampa (VL53L1X) | A balança impede servir com a tigela cheia e confirma que a porção saiu; o nível avisa antes de acabar |
 | D5 | Energia | Fonte de tomada 5 V / 3 A com selo do Inmetro, plugue P4, adaptador com borne e capacitor de 1000 µF. O cabo de 5 V entra por trás do pedestal, num protetor espiral | A parte de 127/220 V fica na tomada, fora do alcance do gato e fora da caixa impressa. Se o gato morder o cabo, são 5 V: sem risco de choque |
-| D6 | Rede | Wi-Fi local para tudo. De fora de casa, só o Telegram | Sem servidor próprio e sem porta aberta no roteador |
+| D6 | Rede | Wi-Fi local. O ESP32 abre a conexão com o servidor; de fora de casa, o acesso é pelo PWA, via Tailscale ou nuvem (decidir na E13 do roteiro) | Sem porta aberta no roteador |
 | D7 | Alexa | Espalexa local (emula Philips Hue) | 100% local e gratuito; só precisa de "servir agora" |
-| D8 | Segurança do gato | Limite diário + intervalo mínimo, aplicados no firmware | Nenhum cliente (interface, Alexa, Telegram, bug) consegue burlar |
+| D8 | Segurança do gato | Limite diário + intervalo mínimo, aplicados no firmware | Nenhum cliente (servidor, interface, Alexa, bug) consegue burlar |
 | D9 | Relógio | Só NTP, sem módulo RTC | O ESP32 guarda a hora enquanto está ligado. Sem hora, a agenda espera, e a refeição perdida em até 2 h é servida quando a hora volta |
 | D10 | Firmware | C++ com framework Arduino, PlatformIO no VS Code, ambiente extra para o Wokwi | O Espalexa é biblioteca Arduino; o Wokwi roda o mesmo código |
-| D11 | Interface | PWA em React + Vite + TS servido pelo próprio ESP32 (LittleFS) | Sem app nativo, sem loja, sem build mobile |
+| D11 | Interface | PWA em React + Vite + TS servido pelo servidor Fastify, com HTTPS | Sem app nativo, sem loja, sem build mobile. Com HTTPS, o PWA instala de verdade e tem service worker |
 | D12 | Configurar o Wi-Fi | Portal cativo (WiFiManager) | Troca de roteador sem regravar firmware |
-| D13 | Avisos | LED da própria placa + mensagens no Telegram | Sem buzzer: o aviso chega mesmo com você fora |
+| D13 | Avisos | LED da própria placa + notificação push do PWA. O Telegram só entra se o push não servir (decidir na E12 do roteiro) | Sem buzzer: o aviso chega mesmo com você fora |
 | D14 | Contato com a ração | Garrafa PET (plástico de uso alimentar) e tigela de inox. Garganta, comporta, mesa e bico em **PETG natural**, removíveis sem ferramenta, com comporta reserva | Nada pintado ou com pigmento no caminho da comida; tudo sai para lavar |
 | D15 | CAD | OpenSCAD paramétrico escrito pelo Claude; impressão terceirizada em mesa de até 200 × 200 mm | CAD como código, versionável. A garganta se ajusta à garrafa que você tiver |
 | D16 | Compras | Mercado Livre para começar já; AliExpress só no que fica bem mais barato | Poucos itens; o frete longo não segura o projeto |
 | D17 | Revestimento | Capa no estilo cafeteira, pedestal com a eletrônica dentro e tigela no alto (borda a ~10 cm do chão) | Nenhum fio nem peça móvel ao alcance do gato, e uma altura mais confortável para ele comer |
+| D18 | Servidor | Fastify + MongoDB com DDD e TDD, como **companheiro** do ESP32 ([roteiro do sistema](ROTEIRO-SISTEMA.md)) | Aprender backend num domínio real; configuração, histórico longo e avisos num lugar só. O ESP32 continua decidindo sozinho: com o servidor fora do ar, o gato come |
+| D19 | Conversa ESP32 ↔ servidor | MQTT com Mosquitto; o ESP32 abre a conexão. Confirmar na E9 do roteiro | Configuração retida no broker, aviso de "offline" de graça e entrega garantida dos eventos |
 
 ---
 
@@ -68,16 +71,17 @@
 ### 3.1 Visão geral
 
 ```
-                 ┌──────────────── Wi-Fi da casa ────────────────┐
-  Celular / PC ──┤  http://alimentador.local  (ou IP reservado)  │
-  (PWA React)    │        │                                      │
-                 │        ▼                                      │
-  Echo Dot ──────┤   ESP32  ── /v1/* (API REST JSON)             │
-  (Hue local)    │          ── /     (PWA no LittleFS)           │
-                 │          ── /api, /description.xml (Espalexa) │
-                 └────────────────────┬──────────────────────────┘
-                                      │ conexão de saída (HTTPS)
-  Celular fora de casa ◄──── Telegram ┘   sem porta aberta no roteador
+  Celular (PWA) ── HTTPS (Tailscale ou nuvem) ──┐
+                                                ▼
+                 ┌──────────────── Servidor (Fastify) ─────────────┐
+                 │  /v1/* (API REST JSON) + PWA        MongoDB      │
+                 │  configuração, histórico longo, avisos           │
+                 └───────────────────────┬─────────────────────────┘
+                                         │ MQTT (Mosquitto): o ESP32 abre a conexão
+                 ┌──────────────── Wi-Fi da casa ──────────────────┐
+  Echo Dot ──────┤   ESP32  ── agenda, limites, tigela (decide)    │
+  (Hue local)    │          ── /api, /description.xml (Espalexa)   │
+                 └─────────────────────────────────────────────────┘
 
   ESP32 GPIO 18     ──► Servo MG996R ──► comporta dosadora
   ESP32 GPIO 32/33  ◄── HX711 ◄── célula de carga (balança da tigela)
@@ -85,11 +89,11 @@
   ESP32 GPIO 2      ──► LED da placa (estado)
 ```
 
-Não existe servidor, banco nem nuvem própria. Toda a regra de negócio mora no ESP32.
+A regra que protege o gato (agenda, limite diário, intervalo mínimo, tigela) mora no ESP32. O servidor guarda a configuração, o histórico longo e os avisos, e serve o PWA. Se o servidor cair, o ESP32 segue a última configuração recebida e reenvia o histórico quando ele voltar. Detalhes no [roteiro do sistema](ROTEIRO-SISTEMA.md).
 
 ### 3.2 Fluxo de uma porção
 
-1. Algum cliente pede porção: agenda, interface (`POST /v1/feed`), Alexa ("Alexa, liga o alimentador") ou Telegram (`/servir`).
+1. Algum cliente pede porção: agenda, interface (`POST /v1/feed` no servidor, que repassa por MQTT) ou Alexa ("Alexa, liga o alimentador").
 2. Tudo passa por **uma única porta de entrada**: `requestDispense(porcoes, origem)`.
 3. A porta checa **limite diário** e **intervalo mínimo**. Se recusar, devolve o motivo e registra no histórico.
 4. **Confere a tigela.** Com a balança parada (menos de 1 g de variação em 2 s), se a tigela tem mais que o limite (~10 g, configurável), não serve:
@@ -98,9 +102,9 @@ Não existe servidor, banco nem nuvem própria. Toda a regra de negócio mora no
 5. Para cada porção, o servo leva a comporta do ângulo de encher (0°) ao de servir (60°), sem pressa (~0,5 s).
 6. Espera o bolso esvaziar (~0,4 s) e dá duas sacudidas curtas (60° → 50° → 60°) para soltar o que grudou.
 7. Volta para 0° e espera o bolso encher de novo (~0,6 s). Depois da última porção, desliga o sinal do servo (`detach`).
-8. **Confirma na balança.** Se o peso não subiu perto de uma dose, entra em `VAZIO`: a garrafa esvaziou ou a comporta travou. O servo para de tentar e o Telegram avisa.
-9. Registra no histórico: hora, porções, gramas medidos, origem e resultado.
-10. Lê o **sensor de nível**. Abaixo de 20%, avisa na interface e no Telegram com os dias que faltam.
+8. **Confirma na balança.** Se o peso não subiu perto de uma dose, entra em `VAZIO`: a garrafa esvaziou ou a comporta travou. O servo para de tentar, e o servidor avisa no celular.
+9. Registra no histórico local e manda o evento para o servidor: hora, porções, gramas medidos, origem e resultado.
+10. Lê o **sensor de nível**. Abaixo de 20%, o servidor avisa no celular com os dias que faltam.
 
 **Se um sensor falhar** (sem leitura ou com valor impossível), o gato não fica sem comer. A agenda continua só com o limite diário e o intervalo mínimo, e você recebe o aviso "balança sem leitura" ou "sensor de nível sem leitura".
 
@@ -118,7 +122,7 @@ Não existe servidor, banco nem nuvem própria. Toda a regra de negócio mora no
      └── reconhecer o alerta ◄──── VAZIO ◄───────┘
 ```
 
-Cada estado tem um prazo medido com `millis()`. Nenhum estado usa `delay()`, então a API, a Alexa e o Telegram continuam respondendo enquanto o servo trabalha.
+Cada estado tem um prazo medido com `millis()`. Nenhum estado usa `delay()`, então o MQTT e a Alexa continuam respondendo enquanto o servo trabalha.
 
 **Sem hora válida** (logo depois de ligar, sem internet), a agenda fica pausada. O "servir agora" continua funcionando, e o intervalo mínimo é contado pelo `millis()`.
 
@@ -157,7 +161,7 @@ Cada estado tem um prazo medido com `millis()`. Nenhum estado usa `delay()`, ent
 
 ### 3.5 API REST (`/v1`)
 
-O prefixo `/v1` existe porque o Espalexa já ocupa `/api` para emular o Hue.
+Desde 30/10/2026, essa API fica no **servidor Fastify** (etapas E5 a E9 do [roteiro](ROTEIRO-SISTEMA.md)). Os comandos que mexem no aparelho (servir, tara, calibrar, testar o servo, reconhecer o alerta) chegam ao ESP32 por MQTT. O prefixo `/v1` continua, e a separação do `/api` do Espalexa também.
 
 | Método | Rota | Corpo / resposta |
 |---|---|---|
@@ -180,12 +184,12 @@ Fuso horário do Brasil (sem horário de verão desde 2019): `"<-03>3"` no forma
 
 | Dado | Onde | Por quê |
 |---|---|---|
-| Agenda, limites, gramas por porção, ângulos, capacidade, fuso | NVS (`Preferences`) | Pequeno, muda pouco, sobrevive a regravar o firmware |
+| Agenda, limites, gramas por porção, ângulos, capacidade, fuso | MongoDB no servidor (fonte da verdade) e cópia na NVS (`Preferences`) do ESP32 | O ESP32 segue a última configuração recebida, mesmo sem servidor |
 | Hora da última refeição, tara e fator da balança | NVS | Precisam sobreviver a uma queda de luz |
-| Histórico | LittleFS, arquivo JSON Lines com buffer circular (~500 linhas) | Cresce; precisa de limite |
-| Interface web | LittleFS (`/www`, arquivos com gzip) | Servida pelo próprio ESP32 |
-| Senha do Wi-Fi | Guardada pela WiFiManager | Nunca no código nem no git |
-| Token do Telegram e seu `chat_id` | NVS, configurados pela interface | Nunca no código nem no git |
+| Histórico | LittleFS no ESP32, JSON Lines com buffer circular (~500 linhas), e MongoDB no servidor | O local cobre o período sem servidor e é reenviado depois; o servidor guarda tudo |
+| Interface web | Servidor Fastify | O ESP32 não serve mais a interface |
+| Senha do Wi-Fi, endereço e senha do broker MQTT | Guardados pela WiFiManager e na NVS | Nunca no código nem no git |
+| Senhas e chaves do servidor | Variáveis de ambiente | Nunca no git |
 
 ### 3.7 Módulos do firmware
 
@@ -200,9 +204,9 @@ firmware/
 │   ├── feeder.{h,cpp}        # máquina de estados e servo
 │   ├── sensors.{h,cpp}       # balança (HX711) e nível (VL53L1X)
 │   ├── history.{h,cpp}       # buffer circular no LittleFS
-│   ├── web.{h,cpp}           # AsyncWebServer: /v1 + arquivos estáticos
+│   ├── mqtt.{h,cpp}          # conversa com o servidor (protocolo da E9 do roteiro)
 │   ├── alexa.{h,cpp}         # Espalexa
-│   └── telegram.{h,cpp}      # comandos e avisos (M8)
+│   └── telegram.{h,cpp}      # só se o push do PWA não servir (M8)
 ├── lib/core/                 # LÓGICA PURA, sem Arduino.h
 │   ├── scheduler.{h,cpp}     # "qual refeição vence agora?" e "perdi alguma?"
 │   ├── guard.{h,cpp}         # limite diário, intervalo mínimo e tigela com ração
@@ -219,11 +223,12 @@ A regra mais importante: **`lib/core` não inclui `Arduino.h`.** Recebe a hora c
 | ESP32Servo | Controlar o servo | `attach(18, 500, 2400)`; `detach()` quando parar, para não zumbir nem esquentar |
 | HX711 (bogde) | Balança | Tara com a tigela vazia, calibração com um peso conhecido, média de 10 leituras |
 | VL53L1X (Pololu) | Sensor de nível | `setROISize` estreita o feixe para ele não enxergar as paredes da garrafa |
-| ESPAsyncWebServer + AsyncTCP | Servidor web | Use o fork mantido **ESP32Async** |
-| ArduinoJson (v7) | JSON da API | — |
+| ESPAsyncWebServer + AsyncTCP | Servidor web do Espalexa | Use o fork mantido **ESP32Async** |
+| PubSubClient | MQTT com o servidor (M6) | O buffer padrão é pequeno para a configuração: aumente com `setBufferSize` |
+| ArduinoJson (v7) | JSON das mensagens MQTT | — |
 | Espalexa | Alexa | `#define ESPALEXA_ASYNC` antes do include e `espalexa.begin(&server)` |
 | WiFiManager (tzapu) | Portal cativo | Pode conflitar com o AsyncWebServer na compilação (enum `HTTP_GET` duplicado). Teste no M6; se der conflito, troque por ESPAsyncWiFiManager |
-| UniversalTelegramBot + WiFiClientSecure | Telegram (M8) | A conexão HTTPS usa ~40 KB de RAM; consulte o Telegram a cada 5–10 s, sem travar o loop |
+| UniversalTelegramBot + WiFiClientSecure | Telegram (M8, só se o push do PWA não servir) | A conexão HTTPS usa ~40 KB de RAM; consulte o Telegram a cada 5–10 s, sem travar o loop |
 | NTP | Hora | Já vem no ESP32: `configTzTime("<-03>3", "a.st1.ntp.br", "pool.ntp.org")` |
 
 ---
@@ -397,7 +402,7 @@ Dá para adiantar boa parte do firmware no Wokwi, dentro do VS Code, enquanto as
 | Balança (HX711) | ✅ | O Wokwi tem o módulo HX711 com a célula de carga simulada |
 | Sensor de nível (VL53L1X) | ⚠️ | Provavelmente não existe no Wokwi; um potenciômetro faz o papel da distância |
 | NTP e Telegram | ✅ | O ESP32 simulado acessa a internet pela rede `Wokwi-GUEST` |
-| API `/v1` e interface | ✅ | Pelo `localhost`, com redirecionamento de porta no `wokwi.toml` |
+| Conversa com o servidor (MQTT) | ⚠️ | O ESP32 simulado sai pela `Wokwi-GUEST`. Para alcançar o broker no seu PC, o Wokwi para VS Code tem um gateway privado (endereço `host.wokwi.internal`); conferir no M6. Até lá, o "ESP32 de mentira" da E9 do roteiro faz esse papel |
 | NVS e LittleFS | ⚠️ | Funcionam, mas começam vazios a cada execução |
 | Portal do WiFiManager e `alimentador.local` | ❌ | No simulador o ESP32 entra direto na rede do Wokwi |
 | **Alexa** | ❌ | O Echo precisa achar o ESP32 na sua rede. Só com a placa real (M2) |
@@ -411,9 +416,9 @@ Dá para adiantar boa parte do firmware no Wokwi, dentro do VS Code, enquanto as
 
 Cada marco termina com algo funcionando. A ordem ataca o risco cedo: a Alexa é testada logo que o ESP32 chega, e o mecanismo é testado com ração de verdade antes da estrutura final.
 
-As horas são estimativas de esforço para quem está começando, não prazos. Total: ~65–110 h.
+As horas são estimativas de esforço para quem está começando, não prazos. Total: ~55–90 h aqui, mais ~55–90 h no [roteiro do sistema](ROTEIRO-SISTEMA.md).
 
-**O que roda em paralelo:** enquanto o AliExpress não chega, dá para fazer o M1 no simulador, o M2 com o ESP32 do Mercado Livre e o M5 inteiro no PC. O M4 pode começar assim que o kit impresso chegar, junto com o M3.
+**O que roda em paralelo:** o roteiro do sistema roda inteiro no PC, sem nenhuma peça, em paralelo a tudo. Enquanto o AliExpress não chega, dá para fazer o M1 no simulador, o M2 com o ESP32 do Mercado Livre e o M5 inteiro no PC. O M4 pode começar assim que o kit impresso chegar, junto com o M3.
 
 ### M0 — Compras e ambiente · 2–4 h
 
@@ -516,6 +521,7 @@ A lógica roda inteira no PC e no simulador; só os sensores precisam das peças
 - [ ] No mesmo módulo, a **refeição perdida**: dada a hora da última refeição servida e a agenda, existe uma refeição das últimas 2 h que não saiu?
 - [ ] Criar `lib/core/guard`: dado o histórico do dia e o peso da tigela, aceitar ou recusar um pedido (limite diário, intervalo mínimo, tigela com ração), com o motivo.
 - [ ] Criar `lib/core/level`: dada a distância medida e a altura da garrafa, a porcentagem e quantos dias faltam pela agenda.
+- [ ] Se a E7 do roteiro do sistema já estiver pronta, os testes do `DispositivoSimulado` (em TS) servem de lista para o `guard`.
 - [ ] Escrever testes Unity e rodar com `pio test -e native`:
   - a virada da meia-noite zera o contador do dia;
   - a refeição das 07:30 sai uma vez só, mesmo com o loop rodando várias vezes no mesmo minuto;
@@ -536,41 +542,29 @@ A lógica roda inteira no PC e no simulador; só os sensores precisam das peças
 
 **Pronto quando:** os testes passam no PC e, na placa, uma agenda de 3 refeições em minutos próximos roda sozinha. Desligando 10 min e religando, a refeição perdida sai uma vez. Com ração na tigela, o pedido é recusado; com a garrafa vazia, a porção vira `VAZIO` e avisa.
 
-### M6 — API e Wi-Fi · 8–12 h
+### M6 — Wi-Fi e conversa com o servidor · 8–12 h
 
-**Objetivo:** controlar tudo pelo navegador, sem senha no código.
+Depende da E9 do roteiro do sistema: é lá que o protocolo MQTT fica fechado.
+
+**Objetivo:** o ESP32 configurado sem senha no código e conversando com o servidor.
 
 - [ ] Trocar o `secrets.h` pela WiFiManager: sem rede salva, o ESP32 cria a rede "Alimentador-Setup". No ambiente `wokwi`, pular essa etapa.
-- [ ] Rodar a WiFiManager **antes** de subir o servidor principal.
-- [ ] Um único `AsyncWebServer` na porta 80, compartilhado com o Espalexa.
-- [ ] Registrar as rotas `/v1/*` (seção 3.5), servir o PWA com `serveStatic("/", LittleFS, "/www/")` e deixar o `onNotFound` repassar para `espalexa.handleAlexaApiCall()`.
-- [ ] mDNS como `alimentador.local`.
-- [ ] Reservar um IP fixo para o ESP32 no roteador (alguns Android não resolvem `.local`).
-- [ ] Testar todas as rotas com `curl` ou Bruno/Insomnia, primeiro no Wokwi e depois na placa.
+- [ ] No portal da WiFiManager, campos extras para o endereço, o usuário e a senha do broker MQTT, salvos na NVS.
+- [ ] Rodar a WiFiManager **antes** de subir o servidor do Espalexa.
+- [ ] Cliente MQTT seguindo o `docs/protocolo-mqtt.md`: aplicar a configuração retida e devolver a versão no estado, receber comandos, publicar eventos com `seq` e o estado, e registrar o last will.
+- [ ] O comando `servir` do MQTT passa pelo `requestDispense`, como a agenda e a Alexa.
+- [ ] Ao reconectar, reenviar os eventos do histórico local que vieram depois do `ultimoSeq` informado pelo servidor.
+- [ ] Testar com o servidor de verdade: o "ESP32 de mentira" sai, a placa entra, e o servidor não muda.
 
-**Pronto quando:** dá para ler o status, agendar, servir, calibrar e ajustar os ângulos só com `curl`, e a Alexa continua funcionando.
+**Pronto quando:** a placa aparece online no PWA, recebe a agenda alterada pelo celular e manda o histórico. Com o servidor desligado, a agenda continua, e o histórico se completa quando ele volta. A Alexa continua funcionando.
 
-### M7 — Interface web · 12–20 h
+### M7 — Interface web
 
-**Objetivo:** a parte em que você já é bom.
-
-- [ ] Projeto React + Vite + TypeScript em `web/`.
-- [ ] Em desenvolvimento, usar o proxy do Vite apontando para o ESP32 (ou para a porta do Wokwi).
-- [ ] Telas:
-  1. **Início:** estado, última refeição, porções de hoje contra o limite, peso na tigela, nível da garrafa em % e em dias, e o botão "servir agora" (que vira "servir mesmo assim" quando a tigela tem ração).
-  2. **Agenda:** horários com porções, ativar e desativar, no máximo 8.
-  3. **Histórico:** lista com hora, porções, gramas, origem (agenda, interface, Alexa ou Telegram) e resultado.
-  4. **Ajustes:** gramas por porção, tara e calibração da balança, limite da tigela, limite diário, intervalo mínimo, altura da garrafa, ângulos do servo com botão de teste, fuso e Telegram.
-- [ ] Tratar `429` e `409` da API com mensagens claras ("Limite de hoje atingido", "A tigela ainda tem 12 g", "Já está servindo").
-- [ ] Build com gzip e upload para o LittleFS (`pio run -t uploadfs`).
-- [ ] Manter o bundle pequeno: meta abaixo de 300 KB com gzip, sem biblioteca de UI pesada.
-- [ ] `manifest.json` + ícone para "adicionar à tela inicial".
-
-**Pronto quando:** dá para operar o dispenser inteiro pelo celular, sem `curl`.
-
-**Limitação conhecida:** sem HTTPS não existe service worker. O "app" vira um atalho na tela inicial que abre a página, o que basta para uso em casa.
+Desde 30/10/2026, a interface é um PWA servido pelo servidor Fastify, com HTTPS. As telas, os testes e a instalação no celular estão nas etapas **E10 e E11** do [roteiro do sistema](ROTEIRO-SISTEMA.md). A limitação antiga (sem HTTPS, sem service worker) deixou de existir.
 
 ### M8 — Avisos e comandos de fora de casa (Telegram) · 4–8 h
+
+**Talvez não entre.** Se a notificação push do PWA (E12 do roteiro) funcionar no seu celular, os avisos ficam no servidor, o "servir" de fora de casa é o próprio PWA, e este marco sai do plano. Decidir na E12.
 
 **Objetivo:** saber de longe que o gato comeu, e servir se precisar.
 
@@ -632,7 +626,8 @@ A lógica roda inteira no PC e no simulador; só os sensores precisam das peças
 | Ficar sem hora (luz volta, internet não) | Baixa | Médio | M5 | A agenda espera e a refeição perdida em até 2 h sai; se acontecer muito, o RTC DS3231 entra com 4 fios |
 | Barulho do servo assustar o gato | Média | Baixo | M3 / M9 | Movimento mais lento e acostumar o gato aos poucos |
 | WiFiManager conflitar com o AsyncWebServer | Média | Baixo | M6 | ESPAsyncWiFiManager |
-| `.local` não resolver no celular | Alta (Android) | Baixo | M6 | IP reservado no roteador |
+| Servidor fora do ar (PC desligado, deploy quebrado) | Média | Baixo | E9 / M6 | O ESP32 segue a última configuração e reenvia o histórico quando o servidor volta. Só os avisos param |
+| ESP32 sem achar o broker depois de trocar o roteador | Média | Médio | M6 | IP reservado para a máquina do servidor; endereço do broker editável no portal da WiFiManager |
 | PETG acumulando resíduo | Média | Médio | Uso | PETG natural removível, comporta reserva, lavagem semanal; garrafa trocada quando encardir |
 
 ---
@@ -642,10 +637,10 @@ A lógica roda inteira no PC e no simulador; só os sensores precisam das peças
 Cada item entra só se o uso mostrar que faz falta.
 
 - **Relógio RTC DS3231:** hora sem internet depois de uma queda de luz.
-- **Gráfico de quanto o gato comeu por dia**, com os dados da balança que já existe.
+- **Gráfico de quanto o gato comeu por dia**, com os dados da balança, que já ficam no MongoDB.
 - **Bateria de backup.**
 - **Botão físico** para servir e para reconhecer alertas.
-- **MQTT / Home Assistant** como mais uma porta de entrada para o `requestDispense`, sem mexer no resto.
+- **Home Assistant**, que se conecta ao broker MQTT que já existe.
 - **App nativo** (React Native/Expo) consumindo a mesma API `/v1`.
 
 ---
@@ -655,8 +650,11 @@ Cada item entra só se o uso mostrar que faz falta.
 ```
 dispenser/
 ├── README.md
+├── docker-compose.yml  # MongoDB e Mosquitto (roteiro do sistema)
 ├── firmware/      # PlatformIO (seção 3.7), com wokwi.toml e diagram.json
-├── web/           # React + Vite + TS; o build vai para firmware/data/www
+├── server/        # Fastify + DDD (roteiro do sistema)
+├── web/           # PWA React + Vite + TS; o build é servido pelo server
+├── contratos/     # schemas Zod da API, usados pelo server e pelo web
 ├── cad/           # OpenSCAD paramétrico + STLs exportados
 │   ├── params.scad      # medidas da garrafa, folgas, ângulos
 │   ├── kit-teste.scad   # garganta, comporta, cubo, mesa, bico, coluna, cupom
@@ -671,7 +669,7 @@ dispenser/
 - **Firmware e eletrônica:** peça a explicação do conceito e uma revisão do que você escreveu. Por combinação, o Claude não entrega o firmware pronto.
 - **Simulador:** mande o `diagram.json` e o que aparece no Wokwi; o Claude ajuda a montar o circuito e a interpretar.
 - **CAD:** peça o OpenSCAD do marco atual ("faz o kit de teste do M4" + as medidas da garrafa), revise os parâmetros e mande imprimir.
-- **Interface:** você faz; peça revisão quando quiser.
+- **Servidor e interface:** mentoria com TDD, etapa por etapa, como explica a seção 4 do [roteiro do sistema](ROTEIRO-SISTEMA.md).
 - **Quando travar:** mande o código, uma foto da montagem e a saída do Serial Monitor juntos. É bem mais rápido de diagnosticar.
 
 ---
@@ -682,9 +680,10 @@ dispenser/
 - [ ] Cada porção pesa o mesmo dentro de ±15%, com a garrafa cheia ou quase vazia.
 - [ ] Recusa porções acima do limite diário ou antes do intervalo mínimo, venha o pedido de onde vier.
 - [ ] Não serve com ração na tigela, e avisa quando uma porção não saiu.
-- [ ] Avisa no Telegram quando a garrafa está abaixo de 20%.
-- [ ] "Alexa, liga o alimentador" e `/servir` no Telegram soltam uma porção, respeitando os limites.
-- [ ] Interface no celular com agenda, servir agora, status, nível, histórico, calibração e limites.
+- [ ] Avisa no celular quando a garrafa está abaixo de 20%.
+- [ ] "Alexa, liga o alimentador" e o "servir agora" do PWA soltam uma porção, respeitando os limites.
+- [ ] PWA instalado no celular, funcionando de fora de casa, com agenda, servir agora, status, nível, histórico, calibração e limites.
+- [ ] Com o servidor fora do ar, o alimentador continua servindo pela agenda, e o histórico se completa quando ele volta.
 - [ ] Configuração de Wi-Fi pelo portal, sem senha nem token no código.
 - [ ] Garganta, comporta, mesa, bico e tigela saem para lavar sem ferramenta.
 - [ ] Não tomba com a garrafa cheia, e nenhum fio ou peça móvel fica ao alcance do gato.
@@ -702,3 +701,4 @@ dispenser/
 | 29/10/2026 | Plano reescrito para o protótipo 3: garrafa PET, comporta dosadora com servo MG996R, sem sensores, sem RTC, sem solda; Telegram para avisos de fora de casa; trilha do simulador Wokwi. A versão anterior foi para `arquivo/`. |
 | 29/10/2026 | Versão revestida: capa estilo cafeteira, pedestal com a eletrônica, tigela a ~10 cm do chão, sem fio exposto (cabo de 5 V num protetor espiral). Segurança com balança na tigela (HX711) e sensor de nível na tampa (VL53L1X). Comporta passa a girar 60°. Lista de compras e custos atualizados. |
 | 29/10/2026 | Nova seção 4.6 com os links de compra de cada item, o preço visto e o que conferir no anúncio, e a ordem de compra sugerida. |
+| 30/10/2026 | Entra um servidor Fastify + MongoDB com DDD (D18), como companheiro do ESP32, que continua decidindo sozinho. Conversa por MQTT (D19). O PWA sai do LittleFS e passa a ser servido pelo servidor, com HTTPS (D11); a API `/v1` também vai para o servidor. Avisos por notificação push, com o Telegram em espera (D13, M8). M6 reescrito e M7 movido para o novo [roteiro do sistema](ROTEIRO-SISTEMA.md). |
