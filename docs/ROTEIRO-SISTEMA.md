@@ -2,7 +2,9 @@
 
 > Trilha guiada do software que roda fora do ESP32: servidor Fastify com DDD, MongoDB, conversa com o ESP32 por MQTT e PWA instalado no celular.
 > Complementa o [PLANO-DE-ACAO.md](PLANO-DE-ACAO.md). Começada em 30/10/2026.
-> **Formato:** mentoria com TDD. Você escreve os testes e o código; o Claude explica o conceito, define o que testar e revisa.
+> **Formato:** mentoria com TDD. Você escreve os testes e o código; o Claude explica o conceito, define o que testar e revisa. O método está em [mentoria.md](mentoria.md).
+>
+> **Progresso (03/11/2026):** E0, E1 e E2 concluídas. E3 em andamento, com 4 de 10 itens prontos; o próximo é a R5. São 43 testes passando. A tabela da seção 5 mostra a situação de cada etapa.
 
 ---
 
@@ -35,7 +37,7 @@ E uma coisa ele **não** faz: decidir se o gato come. A agenda, o limite diário
 | S6 | Validação | Zod na borda HTTP, para a **forma** do dado (400). Regras no domínio, para o **sentido** do dado (422) | Cada camada valida o que é dela |
 | S7 | Conversa com o ESP32 | MQTT com Mosquitto, e o ESP32 é quem abre a conexão. Confirmar na E9 | Configuração retida no broker, aviso de "offline" de graça (last will) e entrega garantida dos eventos (QoS 1). Funciona com o servidor em casa ou na nuvem |
 | S8 | Interface | PWA em React + Vite + TS, com `vite-plugin-pwa`. Em produção, servido pelo próprio Fastify | Mesma origem da API, então não precisa de CORS |
-| S9 | Linguagem do código | Termos do domínio em português, iguais aos do plano (Alimentador, Refeição, Porção, Horário, Tigela); termos técnicos em inglês (repository, mapper, handler) | Linguagem ubíqua: o código fala como o plano |
+| S9 | Linguagem do código | Mudou na E2: identificadores em inglês (`Feeder`, `Portion`, `Timing`, `ScheduledMeal`, `Configuration`); nomes de teste, comentários e mensagens em português. Pendente: `ErroDeDominio`, `codigo` e os códigos de erro ainda estão em português | Escolha do usuário. O glossário liga cada termo ao nome no código |
 | S10 | Pacotes | pnpm | Já está instalado |
 | S11 | HTTPS e onde o servidor roda | Decidir na E11 e na E13. Recomendação: em casa, com Tailscale | Detalhes nas etapas |
 
@@ -116,35 +118,37 @@ Os testes ficam ao lado do código (`horario.ts` e `horario.test.ts`).
 
 Nenhuma etapa precisa de peça: o roteiro inteiro roda no PC, em paralelo ao hardware. Total: ~55–90 h.
 
-| Etapa | Entrega | Horas |
-|---|---|---|
-| E0 | Ambiente e esqueleto | 2–3 |
-| E1 | Glossário e modelo no papel | 1–2 |
-| E2 | Value objects: `Horario` e `Porcoes` | 2–3 |
-| E3 | Agregado `Alimentador`: configuração e agenda | 4–6 |
-| E4 | Casos de uso e repositório em memória | 3–4 |
-| E5 | Fastify: `/v1/config` e `/v1/schedules` | 4–6 |
-| E6 | MongoDB | 4–6 |
-| E7 | Porta `Dispositivo` e "servir agora" | 4–6 |
-| E8 | Eventos, histórico e status | 4–6 |
-| E9 | MQTT e o "ESP32 de mentira" | 8–12 |
-| E10 | PWA: as telas | 12–20 |
-| E11 | PWA no celular (HTTPS) | 2–4 |
-| E12 | Avisos por notificação push | 4–6 |
-| E13 | Deploy | 3–6 |
+| Etapa | Entrega | Horas | Situação |
+|---|---|---|---|
+| E0 | Ambiente e esqueleto | 2–3 | ✅ Concluída |
+| E1 | Glossário e modelo no papel | 1–2 | ✅ Concluída |
+| E2 | Value objects: `Horario` e `Porcoes` (no código: `Timing` e `Portion`) | 2–3 | ✅ Concluída |
+| E3 | Agregado `Alimentador` (no código: `Feeder`): configuração e agenda | 4–6 | 🟡 Em andamento: 4 de 10 itens. Próximo: R5 |
+| E4 | Casos de uso e repositório em memória | 3–4 | ⬜ |
+| E5 | Fastify: `/v1/config` e `/v1/schedules` | 4–6 | ⬜ |
+| E6 | MongoDB | 4–6 | ⬜ |
+| E7 | Porta `Dispositivo` e "servir agora" | 4–6 | ⬜ |
+| E8 | Eventos, histórico e status | 4–6 | ⬜ |
+| E9 | MQTT e o "ESP32 de mentira" | 8–12 | ⬜ |
+| E10 | PWA: as telas | 12–20 | ⬜ |
+| E11 | PWA no celular (HTTPS) | 2–4 | ⬜ |
+| E12 | Avisos por notificação push | 4–6 | ⬜ |
+| E13 | Deploy | 3–6 | ⬜ |
 
 ### E0 — Ambiente e esqueleto · 2–3 h
 
 **Objetivo:** um projeto que compila, testa e roda em modo watch.
 
-- [ ] No repositório do sistema, `.gitignore` com `node_modules`, `dist` e `.env`.
-- [ ] `server/` como subpasta, para o `web/` e o `contratos/` entrarem do lado na E10. Dentro dela: pnpm, TypeScript `strict`, `"type": "module"`, Vitest e `tsx` para o modo dev.
-- [ ] Criar as pastas `domain/`, `application/`, `infra/` e `http/`.
-- [ ] Biome para lint e formatação: uma ferramenta só.
-- [ ] Um teste bobo passando e um `main.ts` que sobe o Fastify com `GET /health`.
-- [ ] Scripts: `pnpm test`, `pnpm dev` e `pnpm typecheck` (`tsc --noEmit`).
+- [x] No repositório do sistema, `.gitignore` com `node_modules`, `dist` e `.env`.
+- [x] `server/` como subpasta, para o `web/` e o `contratos/` entrarem do lado na E10. Dentro dela: pnpm, TypeScript `strict`, `"type": "module"`, Vitest e `tsx` para o modo dev.
+- [x] Criar as pastas `domain/`, `application/`, `infra/` e `http/`.
+- [x] Biome para lint e formatação: uma ferramenta só.
+- [x] Um teste bobo passando e um `main.ts` que sobe o Fastify com `GET /health`.
+- [x] Scripts: `pnpm test`, `pnpm dev` e `pnpm typecheck` (`tsc --noEmit`).
 
 **Pronto quando:** `pnpm test` fica verde, `pnpm typecheck` passa sem erro e `http://localhost:3000/health` responde.
+
+> ✅ **Concluída.** Além do pedido: `buildApp` com opção de logger, `.gitattributes` com LF e `biome.json` na raiz do repo. Pendência pequena: 2 avisos do lint no `/health` (parâmetros `request` e `reply` sem uso).
 
 **Armadilha:** com `"module": "NodeNext"`, todo import relativo precisa terminar em `.js`, mesmo importando um arquivo `.ts`.
 
@@ -152,12 +156,14 @@ Nenhuma etapa precisa de peça: o roteiro inteiro roda no PC, em paralelo ao har
 
 **Conceito:** no DDD, o código usa as mesmas palavras do domínio. Aqui você também separa **entidade** (tem identidade e muda com o tempo), **value object** (definido só pelo valor e imutável) e **agregado** (um grupo de objetos com uma raiz que protege as regras e é salvo de uma vez só).
 
-- [ ] Escrever `docs/glossario.md` com uma linha para cada termo, tirada do plano: Alimentador, Configuração, Agenda, Horário, Porção, Refeição, Origem, Motivo de recusa, Tigela, Garrafa, Alerta, Dispositivo, Versão da configuração. Acrescente o que faltar.
-- [ ] Classificar cada termo como entidade, value object, agregado ou "não é do servidor". Por exemplo, a máquina de estados da refeição é do ESP32.
-- [ ] Listar as regras que o servidor protege. Dica: releia a seção 3.5 do plano e pergunte "que configuração faria o ESP32 recusar refeições todo santo dia?".
-- [ ] Mandar para revisão **antes** de escrever código.
+- [x] Escrever `docs/glossario.md` com uma linha para cada termo, tirada do plano: Alimentador, Configuração, Agenda, Horário, Porção, Refeição, Origem, Motivo de recusa, Tigela, Garrafa, Alerta, Dispositivo, Versão da configuração. Acrescente o que faltar.
+- [x] Classificar cada termo como entidade, value object, agregado ou "não é do servidor". Por exemplo, a máquina de estados da refeição é do ESP32.
+- [x] Listar as regras que o servidor protege. Dica: releia a seção 3.5 do plano e pergunte "que configuração faria o ESP32 recusar refeições todo santo dia?".
+- [x] Mandar para revisão **antes** de escrever código.
 
 **Pronto quando:** glossário revisado e lista de regras fechada. Os testes da E3 saem dela.
+
+> ✅ **Concluída.** O usuário começou os termos, e o Claude completou o glossário a pedido: termos, agregados (Alimentador e Alerta), regras R1 a R14 e dúvidas.
 
 ### E2 — Value objects · 2–3 h
 
@@ -165,36 +171,46 @@ Nenhuma etapa precisa de peça: o roteiro inteiro roda no PC, em paralelo ao har
 
 **Testes, nesta ordem:**
 
-`Horario`
-- [ ] cria a partir de `"07:30"` e devolve `"07:30"` no `toString()`
-- [ ] recusa `"7:30"`, `"24:00"`, `"12:60"`, `""` e `"abc"` com o código `horario_invalido`
-- [ ] `minutosDoDia()` de `"07:30"` é 450
-- [ ] dois `"07:30"` são iguais (`igual()`), e `"07:30"` vem antes de `"12:00"`
-- [ ] a distância entre `"23:50"` e `"00:10"` é de 20 min, passando pela meia-noite
+`Horario` (no código: `Timing`, em `domain/feeder/timing.ts`)
+- [x] cria a partir de `"07:30"` e devolve `"07:30"` no `toString()`
+- [x] recusa `"7:30"`, `"24:00"`, `"12:60"`, `""` e `"abc"` com o código `horario_invalido`
+- [x] `minutosDoDia()` de `"07:30"` é 450 (no código: `minutesOfDay()`)
+- [x] dois `"07:30"` são iguais (`igual()`), e `"07:30"` vem antes de `"12:00"` (no código: `equal()` e `isBefore()`)
+- [x] a distância entre `"23:50"` e `"00:10"` é de 20 min, passando pela meia-noite (no código: `distanceInMinutes()`)
 
-`Porcoes`
-- [ ] aceita de 1 a 10 por refeição
-- [ ] recusa 0, −1, 11 e 1,5 com `porcoes_invalidas`
+`Porcoes` (no código: `Portion`, em `domain/feeder/portion.ts`)
+- [x] aceita de 1 a 10 por refeição
+- [x] recusa 0, −1, 11 e 1,5 com `porcoes_invalidas`
 
 **Pronto quando:** tudo verde, e nenhum arquivo de `domain/` importa algo de fora dele.
+
+> ✅ **Concluída.** O Claude fez o `Portion` como exemplo resolvido, e o usuário fez o `Timing`. O `Timing` também aceita números (`toSchedule(7, 30)`), com testes dos extremos de hora e minuto.
 
 ### E3 — Agregado `Alimentador` · 4–6 h
 
 **Conceito:** a raiz do agregado é a única porta para mudar o que está dentro dele e garante as regras a cada mudança. Uma mudança entra inteira ou não entra. A `versao` sobe a cada mudança aceita: ela serve para o ESP32 saber se está atualizado (E9) e para o banco detectar duas edições ao mesmo tempo (E6). Cada mudança aceita registra um **evento de domínio**, que o caso de uso publica depois de salvar.
 
 **Testes:**
-- [ ] um alimentador novo nasce com a configuração padrão (seção 3.5 do plano) e versão 1
-- [ ] trocar a agenda por uma válida sobe a versão em 1
-- [ ] recusa mais de 8 horários (`agenda_cheia`)
-- [ ] recusa dois horários iguais (`horario_repetido`)
-- [ ] recusa uma agenda cujas porções ativas somam mais que o limite diário (`agenda_acima_do_limite`). Horário desativado não entra na soma
-- [ ] recusa dois horários ativos mais próximos que o intervalo mínimo, inclusive passando pela meia-noite (`horarios_muito_proximos`)
+- [x] um alimentador novo nasce com a configuração padrão (seção 3.5 do plano) e versão 1
+- [x] trocar a agenda por uma válida sobe a versão em 1
+- [x] recusa mais de 8 horários (`agenda_cheia`) — R1
+- [x] recusa dois horários iguais (`horario_repetido`) — R2
+- [ ] **← próximo:** recusa uma agenda cujas porções ativas somam mais que o limite diário (`agenda_acima_do_limite`). Horário desativado não entra na soma — R5
+- [ ] recusa dois horários ativos mais próximos que o intervalo mínimo, inclusive passando pela meia-noite (`horarios_muito_proximos`) — R6
 - [ ] as mesmas regras valem no outro sentido: baixar o limite diário ou aumentar o intervalo mínimo de um jeito que invalida a agenda atual também é recusado
-- [ ] recusa `anguloEncher` igual a `anguloServir`, ou fora de 0–180
-- [ ] uma mudança recusada não altera nada: nem a agenda, nem a versão
+- [ ] recusa `anguloEncher` igual a `anguloServir`, ou fora de 0–180 — R12
+- [x] uma mudança recusada não altera nada: nem a agenda, nem a versão
 - [ ] toda mudança aceita registra o evento `ConfiguracaoAlterada` com a versão nova
 
 **Pronto quando:** tudo verde, e não há como deixar o alimentador inválido pelo lado de fora: sem setter público e sem array exposto em que dê para fazer `push`.
+
+> 🟡 **Em andamento.** O que já está feito:
+> - `Feeder` com `create()`, os getters `version`, `schedule` (devolve cópia) e `configuration`, e `replaceSchedule()`, que valida tudo antes de mudar;
+> - `ScheduledMeal` com `active` (padrão `true`), com teste próprio;
+> - `Configuration.default()`;
+> - teste "mexer na lista devolvida não muda a agenda".
+>
+> Ainda falta: a validação dos campos da configuração (R7 a R11), que entra junto com o "outro sentido", quando existir um método para trocar a configuração.
 
 ### E4 — Casos de uso e repositório em memória · 3–4 h
 
@@ -373,3 +389,4 @@ Nenhuma etapa precisa de peça: o roteiro inteiro roda no PC, em paralelo ao har
 | Data | Mudança |
 |---|---|
 | 30/10/2026 | Roteiro criado: servidor Fastify com DDD e MongoDB como companheiro do ESP32, que continua autônomo; MQTT entre os dois; PWA servido pelo servidor. Formato de mentoria com TDD. |
+| 03/11/2026 | Progresso marcado: E0 a E2 concluídas e E3 em andamento (R1 e R2 prontas). A S9 passou a refletir os nomes em inglês no código. O método de mentoria foi para o [mentoria.md](mentoria.md). |

@@ -61,6 +61,7 @@ Quando o usuário travar, não insista no mesmo formato: mostre o caso pronto.
 5. **Travou:** o Claude escreve o arquivo de teste (vermelho de propósito) e aponta, em tabela, os bugs do código atual e qual teste pega cada um. O usuário implementa.
 6. **Revisão** ("revisa a Ex"): formato abaixo.
 7. **Fecha** quando o "Pronto quando" da etapa no roteiro bate. Um commit por etapa.
+8. **Atualiza o progresso no roteiro:** marca os checkboxes do que ficou pronto, a coluna "Situação" da seção 5 e a linha "Progresso" do topo, com a data.
 
 ## Formato da revisão
 
