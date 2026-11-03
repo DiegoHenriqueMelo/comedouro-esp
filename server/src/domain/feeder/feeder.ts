@@ -46,6 +46,15 @@ export class Feeder {
         "a agenda tem duas refeições no mesmo horário",
       );
     }
+    const actives = meals.filter((m) => m.active);
+    const total = actives.reduce((soma, m) => soma + m.portion.value, 0);
+
+    if(total > this.configuration.dailyLimitPortions){
+      throw new ErroDeDominio(
+        "agenda_acima_do_limite",
+        "Não há espaço na agenda"
+      )
+    }
 
     this._schedule = [...meals];
     this._version++;

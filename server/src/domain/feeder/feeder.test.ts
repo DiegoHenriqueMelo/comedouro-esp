@@ -125,4 +125,30 @@ describe("Feeder", () => {
       );
     });
   });
+
+  describe("R5: a agenda não passa do limite diario", () => {
+    it("aceita uma agenda que soma exatamente o limite", () => {
+      const feeder = Feeder.create();
+
+      const agenda = [meal("07:30", 5), meal("19:30", 5)];
+
+      expect(() => feeder.replaceSchedule(agenda)).toHaveLength(2);
+    });
+
+    it("recusa uma agenda acima do limite com o código agenda_acima_do_limite", () => {
+      const feeder = Feeder.create();
+
+      const agenda = [meal("07:30", 5), meal("19:30", 6)];
+
+      expect(() => feeder.replaceSchedule(agenda)).toThrow(
+        expect.objectContaining({ codigo: "agenda_cima_do_limite" }),
+      );
+    });
+    it("refeição desativada não entra na soma", () => {
+      const feeder = Feeder.create();
+
+      const agenda = [meal("07:30", 5), meal("19:30", 5, false)];
+      expect(() => feeder.replaceSchedule(agenda)).toHaveLength(1);
+    });
+  });
 });
