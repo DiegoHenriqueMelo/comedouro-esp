@@ -1,18 +1,22 @@
-import { Portion } from "./portion.js";
-import { Timing } from "./timing.js";
+import type { Portion } from "./portion.js";
+import type { Timing } from "./timing.js";
 
 export class ScheduledMeal {
   readonly portion: Portion;
   readonly timing: Timing;
   readonly active: boolean;
 
-  private constructor(timing: Timing, portion: Portion) {
+  private constructor(timing: Timing, portion: Portion, active: boolean) {
     this.portion = portion;
     this.timing = timing;
-    this.active = false;
+    this.active = active;
   }
 
-  static create(timing: Timing, portion: Portion): ScheduledMeal {
-    return new ScheduledMeal(timing, portion);
+  static create(
+    timing: Timing,
+    portion: Portion,
+    active = true,
+  ): ScheduledMeal {
+    return new ScheduledMeal(timing, portion, active);
   }
 }

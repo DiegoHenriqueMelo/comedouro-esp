@@ -1,30 +1,43 @@
+import { ErroDeDominio } from "../shared/erro-de-dominio.js";
 import { Configuration } from "./configuration.js";
-import { ScheduledMeal } from "./scheduled-meal.js";
+import type { ScheduledMeal } from "./scheduled-meal.js";
 
 export class Feeder {
+  static readonly MAX_MEALS = 8;
   private _schedule: ScheduledMeal[];
   private _configuration: Configuration;
-  private _version: number = 0;
+  private _version: number = 1;
 
   private constructor(schedule: ScheduledMeal[], configuration: Configuration) {
     this._schedule = schedule;
     this._configuration = configuration;
-    this._version++;
   }
 
-  static create(schedule: ScheduledMeal[]): Feeder {
-    return new Feeder(schedule, Configuration.default());
+  static create(): Feeder {
+    return new Feeder([], Configuration.default());
   }
 
-  get versao(): number {
+  get version(): number {
     return this._version;
   }
 
-  get schedules(): ScheduledMeal[] {
+  get schedule(): ScheduledMeal[] {
     return [...this._schedule];
   }
 
-  replaceScheduled(meals: ScheduledMeal): void {
-    this._schedule.push(meals);
+  get configuration(): Configuration {
+    return this._configuration;
+  }
+
+  replaceSchedule(meals: ScheduledMeal[]): void {
+    if (meals.length > Feeder.MAX_MEALS) {
+      throw new ErroDeDominio(
+        "agenda_cheia",
+        `a agenda aceita no máximo ${Feeder.MAX_MEALS} refeições; recebido: ${meals.length}`,
+      );
+    }
+
+    this._schedule = [...meals];
+    this._version++;
   }
 }

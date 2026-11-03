@@ -28,7 +28,7 @@ export class Configuration {
     this.timeZone = timeZone;
   }
 
-  static default():Configuration {
+  static default(): Configuration {
     return new Configuration(6, 10, 30, 10, 230, 0, 60, "America/Sao_Paulo");
   }
 }

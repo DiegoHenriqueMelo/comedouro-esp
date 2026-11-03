@@ -1,8 +1,27 @@
 import { describe, expect, it } from "vitest";
+import { ErroDeDominio } from "../shared/erro-de-dominio.js";
 import { Feeder } from "./feeder.js";
 import { Portion } from "./portion.js";
 import { ScheduledMeal } from "./scheduled-meal.js";
 import { Timing } from "./timing.js";
+
+// Atalho para os testes: meal("07:30") cria uma refeição ativa com 1 porção.
+function meal(hora: string, porcoes = 1, ativa = true): ScheduledMeal {
+  return ScheduledMeal.create(
+    Timing.create(hora),
+    Portion.create(porcoes),
+    ativa,
+  );
+}
+
+// Uma refeição por hora, a partir de 00:00: mealsOnTheHour(3) → 00:00, 01:00, 02:00.
+// Com 1 porção cada e 1 h de distância, a agenda é válida em todas as outras regras,
+// e o teste só falha pelo motivo que ele está testando.
+function mealsOnTheHour(quantidade: number): ScheduledMeal[] {
+  return Array.from({ length: quantidade }, (_, i) =>
+    meal(`${String(i).padStart(2, "0")}:00`),
+  );
+}
 
 describe("Feeder", () => {
   it("um alimentador novo nasce com a configuração padrão e versão 1", () => {
@@ -39,5 +58,49 @@ describe("Feeder", () => {
     // confere
     expect(feeder.version).toBe(2);
     expect(feeder.schedule).toEqual([cafe]);
+  });
+
+  it("mexer na lista devolvida não muda a agenda", () => {
+    const feeder = Feeder.create();
+
+    feeder.schedule.push(meal("07:30")); // mexe na cópia
+
+    expect(feeder.schedule).toEqual([]); // a agenda de verdade continua vazia
+  });
+
+  describe("R1: no máximo 8 refeições", () => {
+    it("aceita uma agenda com 8 refeições, o máximo", () => {
+      const feeder = Feeder.create();
+
+      feeder.replaceSchedule(mealsOnTheHour(8));
+
+      expect(feeder.schedule).toHaveLength(8);
+    });
+
+    it("recusa uma agenda com 9 refeições com o código agenda_cheia", () => {
+      const feeder = Feeder.create();
+
+      expect(() => feeder.replaceSchedule(mealsOnTheHour(9))).toThrow(
+        ErroDeDominio,
+      );
+      expect(() => feeder.replaceSchedule(mealsOnTheHour(9))).toThrow(
+        expect.objectContaining({ codigo: "agenda_cheia" }),
+      );
+    });
+
+    it("uma mudança recusada não altera nada: nem a agenda, nem a versão", () => {
+      // prepara: um alimentador que já tem uma agenda válida, na versão 2
+      const feeder = Feeder.create();
+      feeder.replaceSchedule([meal("07:30")]);
+
+      // age: tenta trocar por uma agenda inválida
+      expect(() => feeder.replaceSchedule(mealsOnTheHour(9))).toThrow(
+        ErroDeDominio,
+      );
+
+      // confere: tudo como estava antes da tentativa
+      expect(feeder.schedule).toEqual([meal("07:30")]);
+      expect(feeder.version).toBe(2);
+    });
   });
 });
