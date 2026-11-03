@@ -132,7 +132,9 @@ describe("Feeder", () => {
 
       const agenda = [meal("07:30", 5), meal("19:30", 5)];
 
-      expect(() => feeder.replaceSchedule(agenda)).toHaveLength(2);
+      feeder.replaceSchedule(agenda);
+
+      expect(feeder.schedule).toHaveLength(2);
     });
 
     it("recusa uma agenda acima do limite com o código agenda_acima_do_limite", () => {
@@ -141,14 +143,67 @@ describe("Feeder", () => {
       const agenda = [meal("07:30", 5), meal("19:30", 6)];
 
       expect(() => feeder.replaceSchedule(agenda)).toThrow(
-        expect.objectContaining({ codigo: "agenda_cima_do_limite" }),
+        expect.objectContaining({ codigo: "agenda_acima_do_limite" }),
       );
     });
     it("refeição desativada não entra na soma", () => {
       const feeder = Feeder.create();
 
-      const agenda = [meal("07:30", 5), meal("19:30", 5, false)];
-      expect(() => feeder.replaceSchedule(agenda)).toHaveLength(1);
+      const agenda = [meal("07:30", 5, true), meal("19:30", 6, false)];
+
+      feeder.replaceSchedule(agenda);
+      expect(feeder.schedule).toHaveLength(2);
+    });
+  });
+
+  // O intervalo mínimo padrão é de 30 min.
+  describe("R6: refeições ativas separadas pelo intervalo mínimo", () => {
+    it("aceita duas refeições a exatamente 30 min, o mínimo", () => {
+      const feeder = Feeder.create();
+
+      feeder.replaceSchedule([meal("07:30"), meal("08:00")]);
+
+      expect(feeder.schedule).toHaveLength(2);
+    });
+
+    it("recusa duas refeições a 29 min com o código horarios_muito_proximos", () => {
+      const feeder = Feeder.create();
+
+      const agenda = [meal("07:30"), meal("07:59")];
+
+      expect(() => feeder.replaceSchedule(agenda)).toThrow(
+        expect.objectContaining({ codigo: "horarios_muito_proximos" }),
+      );
+    });
+
+    it("recusa 23:50 e 00:10, que estão a 20 min passando pela meia-noite", () => {
+      const feeder = Feeder.create();
+
+      const agenda = [meal("23:50"), meal("00:10")];
+
+      expect(() => feeder.replaceSchedule(agenda)).toThrow(
+        expect.objectContaining({ codigo: "horarios_muito_proximos" }),
+      );
+    });
+
+    it("confere todos os pares, não só os vizinhos na lista", () => {
+      const feeder = Feeder.create();
+
+      // 07:30 e 07:50 estão a 20 min, com o 12:00 entre eles na lista
+      const agenda = [meal("07:30"), meal("12:00"), meal("07:50")];
+
+      expect(() => feeder.replaceSchedule(agenda)).toThrow(
+        expect.objectContaining({ codigo: "horarios_muito_proximos" }),
+      );
+    });
+
+    it("refeição desativada não conta na distância", () => {
+      const feeder = Feeder.create();
+
+      const agenda = [meal("07:30"), meal("07:45", 1, false)];
+
+      feeder.replaceSchedule(agenda);
+      expect(feeder.schedule).toHaveLength(2);
     });
   });
 });

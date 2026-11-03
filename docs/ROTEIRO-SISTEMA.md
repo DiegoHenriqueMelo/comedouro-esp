@@ -4,7 +4,7 @@
 > Complementa o [PLANO-DE-ACAO.md](PLANO-DE-ACAO.md). Começada em 30/10/2026.
 > **Formato:** mentoria com TDD. Você escreve os testes e o código; o Claude explica o conceito, define o que testar e revisa. O método está em [mentoria.md](mentoria.md).
 >
-> **Progresso (03/11/2026):** E0, E1 e E2 concluídas. E3 em andamento, com 4 de 10 itens prontos; o próximo é a R5. São 43 testes passando. A tabela da seção 5 mostra a situação de cada etapa.
+> **Progresso (03/11/2026):** E0, E1 e E2 concluídas. E3 em andamento, com 6 de 10 itens prontos; o próximo é a R6. São 46 testes passando. A tabela da seção 5 mostra a situação de cada etapa.
 
 ---
 
@@ -123,7 +123,7 @@ Nenhuma etapa precisa de peça: o roteiro inteiro roda no PC, em paralelo ao har
 | E0 | Ambiente e esqueleto | 2–3 | ✅ Concluída |
 | E1 | Glossário e modelo no papel | 1–2 | ✅ Concluída |
 | E2 | Value objects: `Horario` e `Porcoes` (no código: `Timing` e `Portion`) | 2–3 | ✅ Concluída |
-| E3 | Agregado `Alimentador` (no código: `Feeder`): configuração e agenda | 4–6 | 🟡 Em andamento: 4 de 10 itens. Próximo: R5 |
+| E3 | Agregado `Alimentador` (no código: `Feeder`): configuração e agenda | 4–6 | 🟡 Em andamento: 6 de 10 itens. Próximo: R6 |
 | E4 | Casos de uso e repositório em memória | 3–4 | ⬜ |
 | E5 | Fastify: `/v1/config` e `/v1/schedules` | 4–6 | ⬜ |
 | E6 | MongoDB | 4–6 | ⬜ |
@@ -195,8 +195,8 @@ Nenhuma etapa precisa de peça: o roteiro inteiro roda no PC, em paralelo ao har
 - [x] trocar a agenda por uma válida sobe a versão em 1
 - [x] recusa mais de 8 horários (`agenda_cheia`) — R1
 - [x] recusa dois horários iguais (`horario_repetido`) — R2
-- [ ] **← próximo:** recusa uma agenda cujas porções ativas somam mais que o limite diário (`agenda_acima_do_limite`). Horário desativado não entra na soma — R5
-- [ ] recusa dois horários ativos mais próximos que o intervalo mínimo, inclusive passando pela meia-noite (`horarios_muito_proximos`) — R6
+- [x] recusa uma agenda cujas porções ativas somam mais que o limite diário (`agenda_acima_do_limite`). Horário desativado não entra na soma — R5
+- [ ] **← próximo:** recusa dois horários ativos mais próximos que o intervalo mínimo, inclusive passando pela meia-noite (`horarios_muito_proximos`) — R6
 - [ ] as mesmas regras valem no outro sentido: baixar o limite diário ou aumentar o intervalo mínimo de um jeito que invalida a agenda atual também é recusado
 - [ ] recusa `anguloEncher` igual a `anguloServir`, ou fora de 0–180 — R12
 - [x] uma mudança recusada não altera nada: nem a agenda, nem a versão
