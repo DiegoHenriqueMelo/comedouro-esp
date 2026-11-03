@@ -103,4 +103,26 @@ describe("Feeder", () => {
       expect(feeder.version).toBe(2);
     });
   });
+
+  describe("R2: Sem horario repetido", () => {
+    it("recusa duas refeições às 07:30 com o código horario_repetido", () => {
+      const feeder = Feeder.create();
+
+      const agenda = [meal("07:30"), meal("07:30", 2)];
+
+      expect(() => feeder.replaceSchedule(agenda)).toThrow(
+        expect.objectContaining({ codigo: "horario_repetido" }),
+      );
+    });
+
+    it("recusa mesmo quando uma delas está desativada", () => {
+      const feeder = Feeder.create();
+
+      const agenda = [meal("07:30", 1, true), meal("07:30", 2, false)];
+
+      expect(() => feeder.replaceSchedule(agenda)).toThrow(
+        expect.objectContaining({ codigo: "horario_repetido" }),
+      );
+    });
+  });
 });

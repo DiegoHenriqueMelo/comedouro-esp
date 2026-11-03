@@ -37,6 +37,16 @@ export class Feeder {
       );
     }
 
+    const minutes = meals.map((m) => m.timing.minutesOfDay());
+    const noRepeat = new Set(minutes);
+
+    if (noRepeat.size < meals.length) {
+      throw new ErroDeDominio(
+        "horario_repetido",
+        "a agenda tem duas refeições no mesmo horário",
+      );
+    }
+
     this._schedule = [...meals];
     this._version++;
   }
