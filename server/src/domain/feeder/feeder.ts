@@ -55,6 +55,19 @@ export class Feeder {
         "Não há espaço na agenda.",
       );
     }
+    for (const [i, a] of actives.entries()) {
+      for (const b of actives.slice(i + 1)) {
+        if (
+          a.timing.distanceInMinutes(b.timing) <
+          this.configuration.minIntervalMinutes
+        ) {
+          throw new ErroDeDominio(
+            "horarios_muito_proximos",
+            "O intervalo entre as refeições está curto",
+          );
+        }
+      }
+    }
 
     this._schedule = [...meals];
     this._version++;

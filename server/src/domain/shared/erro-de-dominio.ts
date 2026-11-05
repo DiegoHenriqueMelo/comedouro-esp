@@ -5,7 +5,8 @@ export type CodigoDeErro =
   | "horario_invalido"
   | "agenda_cheia"
   | "horario_repetido"
-  | "agenda_acima_do_limite";
+  | "agenda_acima_do_limite"
+  | "horarios_muito_proximos";
 
 export class ErroDeDominio extends Error {
   readonly codigo: CodigoDeErro;
