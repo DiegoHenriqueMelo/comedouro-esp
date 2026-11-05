@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ErroDeDominio } from "../shared/erro-de-dominio.js";
+import { Configuration } from "./configuration.js";
 import { Feeder } from "./feeder.js";
 import { Portion } from "./portion.js";
 import { ScheduledMeal } from "./scheduled-meal.js";
@@ -21,6 +22,11 @@ function mealsOnTheHour(quantidade: number): ScheduledMeal[] {
   return Array.from({ length: quantidade }, (_, i) =>
     meal(`${String(i).padStart(2, "0")}:00`),
   );
+}
+
+// A configuração padrão com alguns campos trocados: config({ dailyLimitPortions: 4 }).
+function config(campos: Partial<Configuration>): Configuration {
+  return Configuration.create({ ...Configuration.default(), ...campos });
 }
 
 describe("Feeder", () => {
@@ -204,6 +210,56 @@ describe("Feeder", () => {
 
       feeder.replaceSchedule(agenda);
       expect(feeder.schedule).toHaveLength(2);
+    });
+  });
+
+  // R5 e R6 olham a agenda e a configuração ao mesmo tempo:
+  // trocar a configuração também pode quebrar as duas.
+  describe("trocar a configuração: as regras no outro sentido", () => {
+    it("trocar a configuração por uma válida sobe a versão em 1", () => {
+      const feeder = Feeder.create();
+
+      feeder.replaceConfiguration(config({ dailyLimitPortions: 20 }));
+
+      expect(feeder.version).toBe(2);
+      expect(feeder.configuration.dailyLimitPortions).toBe(20);
+    });
+
+    it("recusa baixar o limite diário para menos que a soma da agenda (agenda_acima_do_limite)", () => {
+      // prepara: agenda com 2 + 3 = 5 porções; o limite padrão é 10
+      const feeder = Feeder.create();
+      feeder.replaceSchedule([meal("07:30", 2), meal("18:00", 3)]);
+
+      // age + confere: com limite 4, o ESP32 recusaria a refeição das 18:00 todo dia
+      expect(() =>
+        feeder.replaceConfiguration(config({ dailyLimitPortions: 4 })),
+      ).toThrow(expect.objectContaining({ codigo: "agenda_acima_do_limite" }));
+    });
+
+    it("recusa aumentar o intervalo mínimo além da distância entre duas refeições (horarios_muito_proximos)", () => {
+      // prepara: 07:30 e 08:00 estão a 30 min, o intervalo padrão
+      const feeder = Feeder.create();
+      feeder.replaceSchedule([meal("07:30"), meal("08:00")]);
+
+      // age + confere: com intervalo de 60 min, as duas ficam próximas demais
+      expect(() =>
+        feeder.replaceConfiguration(config({ minIntervalMinutes: 60 })),
+      ).toThrow(expect.objectContaining({ codigo: "horarios_muito_proximos" }));
+    });
+
+    it("uma troca de configuração recusada não altera nada: nem a configuração, nem a versão", () => {
+      // prepara: agenda com 5 porções, na versão 2
+      const feeder = Feeder.create();
+      feeder.replaceSchedule([meal("07:30", 2), meal("18:00", 3)]);
+
+      // age: tenta baixar o limite para 4
+      expect(() =>
+        feeder.replaceConfiguration(config({ dailyLimitPortions: 4 })),
+      ).toThrow(ErroDeDominio);
+
+      // confere: tudo como estava antes da tentativa
+      expect(feeder.configuration.dailyLimitPortions).toBe(10);
+      expect(feeder.version).toBe(2);
     });
   });
 });
