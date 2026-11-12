@@ -457,11 +457,11 @@ Precisa da placa real; o Wokwi não serve aqui.
 
 **Objetivo:** provar que o Echo Dot enxerga o ESP32 antes de construir em cima disso.
 
-- [ ] Conectar o ESP32 ao Wi-Fi com a senha em `include/secrets.h` (no `.gitignore`).
-- [ ] Criar um dispositivo Espalexa chamado "alimentador".
-- [ ] "Alexa, descobrir dispositivos" e depois "Alexa, liga o alimentador" acendendo o LED.
-- [ ] Depois de agir, voltar o estado do dispositivo para "desligado", para o próximo "liga" funcionar.
-- [ ] Testar também pelo app da Alexa no celular, fora do Wi-Fi de casa (4G). Se funcionar, é um jeito extra de servir de longe.
+- [x] Conectar o ESP32 ao Wi-Fi com a senha em `include/secrets.h` (no `.gitignore`).
+- [x] Criar um dispositivo Espalexa chamado "alimentador".
+- [x] "Alexa, descobrir dispositivos" e depois "Alexa, liga o alimentador" acendendo o LED.
+- [x] Depois de agir, voltar o estado do dispositivo para "desligado", para o próximo "liga" funcionar.
+- [x] Testar também pelo app da Alexa no celular, fora do Wi-Fi de casa (4G). Se funcionar, é um jeito extra de servir de longe.
 
 **Pronto quando:** o comando de voz acende o LED 10 vezes seguidas sem falhar.
 
