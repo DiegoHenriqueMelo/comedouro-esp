@@ -429,7 +429,7 @@ As horas são estimativas de esforço para quem está começando, não prazos. T
 - [ ] Criar o projeto com os ambientes `esp32dev`, `wokwi` e `native` (seção 6).
 - [ ] Montar o `diagram.json` com o ESP32 e um LED, e o `wokwi.toml` apontando para o firmware compilado.
 - [ ] Rodar o "blink" no simulador.
-- [ ] Quando a placa chegar: instalar o driver USB (CP2102 ou CH340, está escrito no chip perto do conector) e gravar o mesmo blink no LED da placa (GPIO 2).
+- [x] Quando a placa chegar: instalar o driver USB (CP2102 ou CH340, está escrito no chip perto do conector) e gravar o mesmo blink no LED da placa (GPIO 2).
 
 **Pronto quando:** o LED pisca com código seu no Wokwi e na placa, e o `Serial.println` aparece no monitor.
 
@@ -442,9 +442,9 @@ As horas são estimativas de esforço para quem está começando, não prazos. T
 **Objetivo:** entender o básico de eletrônica e do loop sem travar.
 
 - [ ] Lei de Ohm na prática: calcular o resistor de um LED (3,3 V, ~10 mA).
-- [ ] LED externo com resistor e botão com `INPUT_PULLUP` e tratamento de bounce.
+- [x] LED externo com resistor e botão com `INPUT_PULLUP` e tratamento de bounce.
 - [ ] No Wokwi: servo indo de 0° a 60° e voltando quando o botão é apertado.
-- [ ] Reescrever tudo **sem `delay()`**: `millis()` + máquina de estados.
+- [x] Reescrever tudo **sem `delay()`**: `millis()` + máquina de estados.
 - [ ] Na protoboard real: LED e botão. Com o multímetro, medir os 5 V e os 3,3 V da placa.
 
 **Pronto quando:** o botão move o servo no simulador e o LED pisca ao mesmo tempo, sem um travar o outro.
