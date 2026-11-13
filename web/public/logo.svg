@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <title>Comedouro</title>
+  <rect width="512" height="512" fill="#1f6f5c"/>
+  <!-- ração -->
+  <g fill="#f2b84b">
+    <circle cx="196" cy="236" r="34"/>
+    <circle cx="256" cy="212" r="38"/>
+    <circle cx="318" cy="238" r="34"/>
+  </g>
+  <!-- tigela -->
+  <path d="M112 262h288c0 74-52 122-144 122s-144-48-144-122z" fill="#f6f3ee"/>
+  <rect x="96" y="246" width="320" height="30" rx="15" fill="#f6f3ee"/>
+</svg>
