@@ -13,6 +13,7 @@ const int RED_PIN = 25;
 const int GREEN_PIN = 26;
 const int LED_ON = LOW;
 const int LED_OFF = HIGH;
+const int CAT_SENSOR_PIN = 27;
 unsigned long lastBlinkAt = 0;
 bool boardLedOn = false;
 int lastButtonState = HIGH;
@@ -23,6 +24,8 @@ unsigned long servingStartedAt = 0;
 bool wifiConnected = false;
 unsigned long lastLevelAt = 0;
 int levelPercent = 100;
+int lastCatState = HIGH;
+int countVisit = 0;
 
 void showColor(int pin)
 {
@@ -81,6 +84,7 @@ void setup()
   pinMode(BUTTON_PIN, INPUT_PULLUP);
   pinMode(RED_PIN, OUTPUT);
   pinMode(GREEN_PIN, OUTPUT);
+  pinMode(CAT_SENSOR_PIN, INPUT);
   digitalWrite(RED_PIN, LED_OFF);
   digitalWrite(GREEN_PIN, LED_OFF);
   digitalWrite(EXTERNAL_LED_PIN, LED_OFF);
@@ -90,6 +94,7 @@ void setup()
 void loop()
 {
   int buttonState = digitalRead(BUTTON_PIN);
+  int catSensorState = digitalRead(CAT_SENSOR_PIN);
   if (WiFi.status() == WL_CONNECTED && wifiConnected == false)
   {
     wifiConnected = !wifiConnected;
@@ -102,6 +107,19 @@ void loop()
   if (wifiConnected)
   {
     espalexa.loop();
+  }
+
+  if (catSensorState == LOW && lastCatState == HIGH)
+  {
+    Serial.println("Gato chegou na tigela");
+    lastCatState = catSensorState;
+    countVisit++;
+  }
+
+  if (catSensorState == HIGH && lastCatState == LOW)
+  {
+    Serial.println("Gato saiu");
+    lastCatState = catSensorState;
   }
 
   if (buttonState == LOW && lastButtonState == HIGH && millis() - lastChangeAt > 50)
