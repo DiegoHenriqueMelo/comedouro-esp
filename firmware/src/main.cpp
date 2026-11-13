@@ -25,7 +25,8 @@ bool wifiConnected = false;
 unsigned long lastLevelAt = 0;
 int levelPercent = 100;
 int lastCatState = HIGH;
-int countVisit = 0;
+int catVisit = 0;
+unsigned long catArrivedAt = 0;
 
 void showColor(int pin)
 {
@@ -113,13 +114,19 @@ void loop()
   {
     Serial.println("Gato chegou na tigela");
     lastCatState = catSensorState;
-    countVisit++;
+    catVisit++;
+    catArrivedAt = millis();
   }
 
   if (catSensorState == HIGH && lastCatState == LOW)
   {
     Serial.println("Gato saiu");
     lastCatState = catSensorState;
+    Serial.print("Visita número: ");
+    Serial.println(catVisit);
+    Serial.print("ficou: ");
+    Serial.print(catArrivedAt);
+    Serial.println("s");
   }
 
   if (buttonState == LOW && lastButtonState == HIGH && millis() - lastChangeAt > 50)
