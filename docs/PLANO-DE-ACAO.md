@@ -157,7 +157,95 @@ Cada estado tem um prazo medido com `millis()`. Nenhum estado usa `delay()`, ent
 - O servo puxa direto do borne, **nunca** do pino 3V3 nem "através" do ESP32.
 - Todos os GND se encontram no borne.
 - O capacitor tem polaridade: a perna do lado da faixa vai no negativo. Invertido, ele estufa.
-- Orçamento de corrente: servo de 0,5 a 1 A andando e até ~2,5 A se travar + ESP32 até ~0,5 A em pico de Wi-Fi. Por isso 3 A.
+- Orçamento de corrente: servo de 0,5 a 1 A andando e até ~2,5 A se travar + ESP32 até ~0,5 A em pico de Wi-Fi. Por isso 3 A. A conta completa está na seção 3.4.1.
+
+### 3.4.1 Cálculo de tensão e corrente
+
+Duas fórmulas resolvem tudo aqui:
+
+- **Lei de Ohm:** `V = R × I`. A tensão que se perde num fio é a resistência do fio vezes a corrente que passa por ele.
+- **Potência:** `P = V × I`.
+
+As correntes são as típicas dos datasheets, arredondadas para cima. O M3 confere tudo com o multímetro.
+
+**1. Quem recebe qual tensão**
+
+| Trilho | De onde vem | Quem usa | Faixa aceita |
+|---|---|---|---|
+| 5 V | Fonte de tomada, pelo borne | Servo MG996R | 4,8–7,2 V. Um pouco abaixo ele funciona, só mais fraco |
+| 5 V | Fonte de tomada, pelo borne | ESP32, pino VIN → regulador da placa | Pelo menos ~4,5 V para o regulador manter os 3,3 V |
+| 3,3 V | Regulador da placa do ESP32 (normalmente um AMS1117) | Chip do ESP32, HX711, VL53L1X | ESP32: 3,0–3,6 V |
+| Sinais | Pinos do ESP32 | Servo (sinal), HX711, VL53L1X | Até 3,3 V. **Um pino do ESP32 não aguenta 5 V** |
+
+O HX711 e o VL53L1X vão no 3,3 V porque mandam sinal de volta para o ESP32, e esse sinal sai na mesma tensão que alimenta o módulo. Alimentados com 5 V, eles mandariam 5 V para um pino que só aguenta 3,3 V.
+
+**2. Quanto cada peça consome**
+
+O regulador do ESP32 é linear: puxa do lado de 5 V a mesma corrente que entrega no lado de 3,3 V. Por isso o consumo em 3,3 V entra direto no total da fonte.
+
+| Peça | Trilho | Parado | Servindo | Pior caso |
+|---|---|---|---|---|
+| ESP32 + placa, com Wi-Fi ligado | 3,3 V (vindo do 5 V) | 0,15 A | 0,15 A | 0,45 A (pico de transmissão) |
+| HX711 + célula de carga | 3,3 V | 0,005 A | 0,005 A | 0,005 A |
+| VL53L1X | 3,3 V | 0,02 A | 0,02 A | 0,04 A |
+| Servo MG996R | 5 V | ~0,01 A (com `detach`) | 0,9 A (girando com carga) | 2,5 A (travado) |
+| **Total puxado da fonte** | | **~0,19 A** | **~1,1 A** | **~3,0 A** |
+
+A fonte de 3 A dá conta com folga no uso normal e fica no limite no pior caso. O pior caso só acontece se o servo travar bem num pico de Wi-Fi, e dura menos de 1 s, porque o firmware dá `detach` no fim do movimento. Uma fonte de 2 A não aguentaria o servo travado.
+
+**3. O calor no regulador do ESP32**
+
+No regulador linear, a tensão que sobra vira calor: `P = (5 V − 3,3 V) × I`.
+
+- Uso normal: 1,7 V × 0,175 A ≈ **0,3 W**. Fica morno.
+- Pico: 1,7 V × 0,5 A ≈ 0,85 W, só por instantes.
+
+Se um dia entrar um módulo que consome mais de ~300 mA contínuos em 3,3 V, ele precisa de um regulador próprio.
+
+**4. Queda de tensão nos fios**
+
+Fio fino tem resistência, e a corrente "come" tensão nele (`V = R × I`). Na conta entram:
+
+- **Resistência do fio de cobre por metro:** 22 AWG = 0,053 Ω; 24 AWG = 0,084 Ω; 26 AWG = 0,134 Ω; 28 AWG = 0,213 Ω.
+- **O comprimento duas vezes,** porque a corrente vai pelo positivo e volta pelo negativo.
+- **~0,03–0,05 Ω por encaixe** (plugue P4, ponta de jumper).
+
+| Trecho | Conta | Resistência | Corrente | Queda |
+|---|---|---|---|---|
+| Cabo da fonte (1,5 m de 24 AWG) + plugue P4 | 3 m × 0,084 + 0,05 | ≈ 0,30 Ω | 1,1 A servindo / 3 A no pior caso | 0,33 V / 0,9 V |
+| Servo: 30 cm do cabo dele + 40 cm de jumper, 26 AWG, + 4 encaixes | 1,4 m × 0,134 + 4 × 0,03 | ≈ 0,31 Ω | 0,9 A | 0,28 V |
+| ESP32: 40 cm de jumper 26 AWG + 2 encaixes | 0,8 m × 0,134 + 2 × 0,03 | ≈ 0,17 Ω | 0,45 A | 0,08 V |
+
+Com a fonte entregando 5,0 V:
+
+| Ponto | Servindo | Pior caso |
+|---|---|---|
+| Borne | 5,0 − 0,33 ≈ **4,67 V** | 5,0 − 0,9 ≈ **4,1 V** |
+| VIN do ESP32 | 4,67 − 0,08 ≈ **4,6 V** ✅ (acima de 4,5 V) | ≈ 4,0 V ⚠️ |
+| 3,3 V da placa | 3,3 V ✅ | ≈ 2,9–3,0 V ⚠️ (o regulador perde ~1,1 V) |
+| Servo | 4,67 − 0,28 ≈ **4,4 V** ⚠️ | — (travado) |
+
+- **Servindo, funciona.** O ESP32 mantém os 3,3 V. O servo recebe ~4,4 V, um pouco abaixo dos 4,8 V do datasheet: gira, só um pouco mais lento e mais fraco.
+- **No pior caso, o ESP32 encosta no limite por menos de 1 s.** Não chega a reiniciar (o detector de queda do ESP32 atua por volta de 2,4–2,8 V), mas o Wi-Fi pode falhar nesse instante. As proteções do item 7 cuidam disso.
+
+**5. O capacitor de 1000 µF**
+
+A fonte chaveada leva ~0,1 ms para reagir quando a corrente sobe de repente, como no arranque do servo. Nesse intervalo quem entrega a corrente é o capacitor, e a tensão dele cai `ΔV = I × Δt / C`:
+
+2 A × 0,0001 s ÷ 0,001 F = **0,2 V**.
+
+Sem o capacitor, o borne afundaria bem mais nesse instante. Por isso ele fica no borne, junto do servo e do ESP32.
+
+**6. Consumo de energia**
+
+Parado o tempo todo: 5 V × 0,19 A ≈ 1 W. Com a perda da própria fonte (~80% de eficiência), dá ~1,2 W na tomada, ou ~0,9 kWh por mês: **menos de R$ 1 de luz por mês**. As porções quase não contam: 4 por dia × 2 s × 5 W ≈ 0,01 Wh.
+
+**7. O que fazer com essas contas**
+
+1. **Fonte:** a de 5 V / 3 A está certa. Ao receber, meça a saída em vazio: a maioria entrega 5,1–5,2 V, e esses décimos a mais compensam parte da queda no cabo.
+2. **Firmware:** `detach()` no fim de cada movimento e movimento devagar, que puxa menos corrente. Servo travado é o único jeito de chegar a 3 A.
+3. **Fios do servo:** jumpers servem. Se no M3 o servo ficar fraco, troque só os fios de força dele (vermelho e marrom) por fio de 22 AWG direto no borne. A queda cai de ~0,28 V para ~0,15 V.
+4. **Medição no M3** (seção 7): com o servo forçando contra a mão por 1 s, o borne precisa ficar em pelo menos 4,5 V e o pino 3V3 em pelo menos 3,2 V.
 
 ### 3.5 API REST (`/v1`)
 
@@ -276,6 +364,7 @@ Se não quiser esperar, tudo isso também tem no Mercado Livre, uns 30–50% mai
 | Estilete, tesoura, lixa fina e chave Phillips pequena | R$ 0–20 | Cortar a garrafa e montar |
 | Multímetro básico | R$ 0–60 | Emprestado serve. Útil para conferir a polaridade da fonte |
 | Ferro de solda simples + estanho | R$ 0–60 | Só para os ~8 pontos do HX711 e da célula. Uma assistência técnica de celular faz por poucos reais |
+| Cantoneira em L + bucha e parafuso para a parede | R$ 10–20 | Impede o dispenser de tombar (seção 5.2). Sem furar a parede: base de MDF de 40 × 30 cm e 15 mm, uns R$ 20–40 cortada na loja |
 
 ### 4.4 Impressão terceirizada
 
@@ -349,10 +438,10 @@ Valores do modelo 3D. No OpenSCAD eles viram variáveis no topo do arquivo; os d
 | Garrafa | PET de 2 L, corpo Ø 105 mm. Gargalo cortado onde o ombro passa de **Ø 54 mm**; fundo cortado | A boca da garrafa (~21 mm) é estreita demais para ração de gato e forma ponte |
 | Reservatório | ≈ 2 L | ≈ 0,9 kg de ração (a 0,45 kg/L); cerca de 2 semanas para um gato |
 | Garganta | Cone de Ø 110 para Ø 36 mm em 50 mm de altura (paredes a ~53°) + colar de 25 mm para o ombro da garrafa | Ração para de escorrer abaixo de ~40° |
-| Comporta | Leque de raio 70 mm, 14 mm de espessura, bolso de Ø 36 mm a 48 mm do eixo | Bolso de ≈ 14 mL → ≈ 6 g. **Calibrar com balança** |
+| Comporta | Leque de raio 70 mm, bolso de Ø 36 mm a 48 mm do eixo. Espessura = 1,2 × a maior medida do grão, no mínimo 6 mm (10 mm para grão de 8 mm; seção 5.2) | Com 10 mm, bolso de ≈ 10 mL → ≈ 4,6 g por giro. **Calibrar com balança** |
 | Giro | 0° para encher, 60° para servir | O furo de saída fica a 60° da garganta, em volta do eixo do servo |
 | Mesa | 4 mm, furo de saída de Ø 38–40 mm | Um pouco maior que o bolso, para ele esvaziar inteiro |
-| Folgas da comporta | 0,5 mm para a garganta e 0,5 mm para a mesa | Ajustar no cupom do M4 |
+| Folgas da comporta | 1 mm para a garganta e 0,5 mm para a mesa | A garganta desce ~0,3 mm com a garrafa cheia (seção 5.2). Ajustar no cupom do M4 |
 | Fixação da comporta | Braço redondo que vem com o servo, parafusado num **cubo** impresso. A comporta encaixa no cubo (sextavado) e trava com uma porca borboleta | A comporta sai para lavar sem ferramenta, e o servo fica montado |
 | Bico | ≈ 57 mm, inclinação de 39°, virado 15° para o centro da tigela; termina ~5 mm acima da borda | Acima de 35° a ração desliza no PETG |
 | Coluna | Perfil em U de 30 × 26 mm, 186 mm de altura, aberto atrás | O cabo do servo desce por dentro |
@@ -362,7 +451,7 @@ Valores do modelo 3D. No OpenSCAD eles viram variáveis no topo do arquivo; os d
 | Coluna da tampa | 70 × 74 × 200 mm atrás da garrafa, com a dobradiça em cima | Leva o cabo do sensor de nível |
 | Altura total | ~46 cm | |
 
-**Sugestões para o serviço de impressão:** PETG, camada de 0,2 mm, 3 perímetros, 20–25% de preenchimento (40% na comporta e no cubo). Garganta impressa na posição de uso; as paredes a 53° dispensam suporte.
+**Sugestões para o serviço de impressão:** PETG, camada de 0,2 mm, 3 perímetros, 20–25% de preenchimento. Na comporta, 20% de preenchimento com 4 perímetros bastam (análise de elementos finitos, seção 5.2). No cubo, paredes cheias em volta do encaixe sextavado. Garganta impressa na posição de uso; as paredes a 53° dispensam suporte.
 
 ### 5.1 Peças em contato com a ração
 
@@ -386,6 +475,154 @@ O PETG deforma com calor (a partir de ~70 °C), por isso as peças impressas sã
 5. **Nenhum fio ao alcance do gato.** Cabos só por dentro da coluna e do pedestal. O cabo da fonte sai por trás, rente ao chão, no protetor espiral.
 
 **Para lavar com a capa:** abra a tampa, tire a garrafa, solte a frente da capa, e o resto sai como na tabela.
+
+### 5.2 Cálculo mecânico: estresse, flexão e tombamento
+
+**Premissas**
+
+| Item | Valor |
+|---|---|
+| Ração com a garrafa cheia | 0,9 kg |
+| Garrafa + garganta + tampa apoiada | ~0,15 kg |
+| Peso pendurado no braço da coluna | ~1,05 kg → **10,3 N** |
+| Gato | 4–5 kg |
+| PETG impresso | resiste a ~35 MPa ao longo das camadas e ~20 MPa entre camadas; rigidez E ≈ 2.000 MPa |
+
+**Fórmulas**
+
+- **Peso:** `F = m × g`, com g = 9,81 m/s².
+- **Momento (força × alavanca):** `M = F × d`.
+- **Tensão de flexão:** `σ = M / S`, em que S é o módulo resistente da seção. Para um retângulo cheio, `S = b × h² / 6`.
+- **Fator de segurança:** `FS = resistência / σ`. Em plástico impresso, acima de ~3 já está bom.
+
+**1. Coluna e braço que seguram a garrafa**
+
+O braço segura a garganta 80 mm à frente da coluna: `M = 10,3 N × 80 mm ≈ 824 N·mm`.
+
+| Peça | Seção | S | σ | FS (entre camadas) |
+|---|---|---|---|---|
+| Braço da garganta | 26 × 20 mm, oco, paredes de 1,2 mm | ≈ 660 mm³ | ≈ 1,3 MPa | ≈ 15 |
+| Coluna em U | 30 × 26 mm, paredes de 3 mm | ≈ 950 mm³ | ≈ 0,9 MPa | ≈ 22 |
+| Parede da garganta | cone de 2,5 mm | — | < 0,1 MPa | sobra |
+
+**Nada quebra com o peso da ração.** Mesmo assim, imprima a coluna **deitada**: assim a flexão puxa ao longo das camadas, e o FS sobe para ~40.
+
+**2. A flexão e a folga da comporta**
+
+A peça não quebra, mas verga, e é isso que importa aqui:
+
+- **A coluna gira no topo:** `θ = M × L / (E × I) = 824 × 171 / (2.000 × 16.400) ≈ 0,0043 rad` (0,25°). Na garganta, 80 mm à frente, isso dá 0,0043 × 80 ≈ **0,34 mm** para baixo.
+- **O braço verga:** `δ = F × L³ / (3 × E × I) = 10,3 × 80³ / (3 × 2.000 × 6.600) ≈` **0,13 mm**.
+- **A mesa também desce**, menos, porque fica mais embaixo na coluna: ≈ 0,18 mm.
+
+A folga entre a garganta e a comporta fecha uns **0,3 mm** (0,47 − 0,18) com a garrafa cheia. Dos 0,5 mm previstos sobraria ~0,2 mm. E o PETG ainda cede devagar sob carga constante (fluência), algo como 1,5 a 2 vezes em alguns meses. **A garganta pode passar a raspar na comporta.**
+
+**Mudanças:**
+- folga garganta–comporta de **1 mm**; um grão de 8–10 mm não entra nela;
+- **coluna descendo até o fundo do pedestal**, parafusada no fundo e no tampo, para não girar na base;
+- coluna impressa deitada.
+
+**3. O servo contra a comporta**
+
+- **Giro normal:** a ração se apoia nas paredes da garrafa (efeito silo), então sobre o furo de Ø 36 mm sobra só ~1 N de peso. Com o atrito da comporta, o giro pede ~0,03 N·m, uns **4%** do que o servo entrega (~0,85 N·m ≈ 8,5 kg·cm a 4,4 V). O giro é leve e a corrente fica baixa.
+- **Grão preso na borda:** o servo travado empurra com `F = T / r`: 0,85 / 0,048 ≈ **18 N** no meio do bolso e ≈ 13 N na borda de fora (66 mm do eixo). Um grão de ração seca quebra com algo entre 10 e 40 N, conforme a marca (estimativa). **Pode cortar, pode travar.**
+
+**Mudanças:**
+- borda "de faca" no furo de entrada: cortar pede bem menos força que esmagar;
+- firmware recuando ~10° e tentando de novo quando a porção não confirmar na balança;
+- o teste do M4 com a ração do seu gato decide.
+
+**4. Célula de carga e batentes**
+
+| Situação | Carga | % dos 5 kg |
+|---|---|---|
+| Tigela + prato + ração | ~0,35 kg | 7% |
+| Gato apoiando as patas na tigela | ~2–3 kg | 40–60% |
+| Gato pulando na tigela (impacto ~2× o peso) | ~8–10 kg | 160–200% ⚠️ |
+
+Uma célula de 5 kg costuma aguentar ~150% sem dano e verga só uns décimos de milímetro na carga máxima. Por isso os batentes precisam encostar logo depois dos 5 kg. No modelo 3D eles estão a 1,5 mm: **tarde demais**, a célula já teria entortado.
+
+**Mudança:** batentes reguláveis (parafuso M3 com porca no pedestal). Para regular, coloque ~5 kg no prato (um pacote de arroz) e rosqueie cada batente até encostar.
+
+**5. Gato em cima da capa**
+
+O tampo da capa (a ~25 cm do chão, 160 × 206 mm) é um lugar convidativo para o gato subir. Um gato de 4–5 kg aterrissando faz ~50–100 N numa pata. Num tampo de 3 mm, isso dá **σ ≈ 10–19 MPa**, perto do que a chapa impressa aguenta: pode trincar ou afundar.
+
+**Mudança:** tampo com nervuras por baixo, ou com 4–5 mm. Mas antes de o tampo quebrar, o conjunto tomba (item 6).
+
+**6. Tombamento: o problema de verdade**
+
+| | Garrafa cheia | Garrafa vazia |
+|---|---|---|
+| Massa total | ~2,3 kg | ~1,4 kg |
+| Altura do centro de massa | ~195 mm | ~140 mm |
+
+O lado mais fraco é o lateral: do centro de massa até a linha dos pés são só ~53 mm, porque os pés ficam 22 mm para dentro da borda.
+
+- **Ângulo de tombamento:** `atan(53 / 195) ≈ 15°`.
+- **Força de lado, no alto da garrafa (~40 cm do chão), que derruba:** `F = m × g × b / h = 2,3 × 9,81 × 0,053 / 0,40 ≈` **3 N** (0,3 kgf). Com a garrafa vazia, **1,8 N**.
+- Para frente e para trás é um pouco melhor: ~6 a 9 N.
+
+Um gato se esfregando empurra 5–20 N com facilidade (estimativa). **Do jeito que está, o dispenser tomba.**
+
+| Mudança | Força de lado que derruba (garrafa cheia, no alto) |
+|---|---|
+| Como está | ~3 N |
+| Pés na borda do pedestal (b = 80 mm) | ~4,5 N |
+| + base de MDF ou compensado de 40 × 30 cm e 15 mm (~1,3 kg) parafusada embaixo | ~13 N |
+| **Cantoneira presa na parede**, atrás da coluna da tampa | não tomba |
+
+**Mudança:** encostar o dispenser na parede e prender a coluna da tampa com uma cantoneira. Se não der para furar a parede, use a base de MDF e mantenha o teste de tombamento do M9.
+
+**7. A comporta em elementos finitos**
+
+Simulação 3D da comporta com o servo travado num grão preso: [Estresse na Comporta](https://claude.ai/artifact/Dv5TEuQBPU5WHR36MwgujP). O código do solver está em `c:\diego\artefatos\fea-comporta.js`.
+
+- **Montagem:** 15 mil nós e 71 mil tetraedros, eixo preso, grão empurrando a parede de trás do bolso com torque ÷ 48 mm.
+- **Conferências:** as reações no eixo igualam a carga, e uma malha com o dobro de nós muda os máximos em menos de 5%.
+
+| Torque | Maior tensão | Fator de segurança | Deslocamento |
+|---|---|---|---|
+| 0,85 N·m (grão preso, 5 V) | 0,65 MPa, na borda do eixo | ~54 | ~28 µm |
+| 1,08 N·m (grão preso, 6 V) | 0,83 MPa | ~42 | ~35 µm |
+
+A comporta é muito mais forte que o necessário. A espessura de 14 mm vem do volume do bolso, e não da força. Por isso ela pode ser impressa com menos preenchimento.
+
+O ponto mais carregado é o encaixe do eixo, seguido das concordâncias de 5 mm entre o cubo e o leque. O anel de 4 mm por fora do bolso quase não trabalha.
+
+**8. Espessura mínima da comporta**
+
+Simulação para 14, 12, 10, 8 e 6 mm: [Espessura da Comporta](https://claude.ai/artifact/8jr6PQmxg2qJzBxKsbdSUE).
+
+| Critério | Conta | Mínimo |
+|---|---|---|
+| Grão inteiro no bolso, mesmo de pé | 1,2 × maior medida do grão | **10 mm** para grão de 8 mm; 12 mm para grão de 10 mm |
+| Resistência (segurança ≥ 4) | a tensão cresce com 1/espessura: 0,87 MPa com 10 mm e 1,4 MPa com 6 mm | ~1 mm |
+| Impressão plana (peça de 140 mm) | abaixo disso o PETG empena e some a folga de 0,5 mm com a mesa | 6 mm |
+| Dose | π × 18² × espessura | não limita: só muda os gramas por giro |
+
+**Quem manda é o grão.** Meça a maior medida de uns 20 grãos da ração do seu gato e use 1,2 vez a maior delas. Com grão de 8 mm, a comporta vai de 14 para **10 mm**, e o resto fica assim:
+
+- **Massa:** cai de 37 para 29 g por peça.
+- **Dose:** 4,6 g por giro, então uma refeição de 20 g sai em 5 giros.
+- **Segurança:** cai para 40×.
+
+A economia é pequena: ~17 g contando a reserva, uns R$ 3–8. O custo de verdade está no revestimento.
+
+No M4, imprima duas comportas de espessuras diferentes (por exemplo, 10 e 12 mm) no lugar da comporta + reserva, e teste as duas com a ração real. Se afinar, a garganta e a coluna descem o mesmo tanto (um parâmetro no OpenSCAD).
+
+**Resumo do que o cálculo mudou**
+
+| Achado | Mudança |
+|---|---|
+| As peças aguentam o peso com folga (FS > 15) | Nenhuma |
+| A garganta desce ~0,3 mm com a garrafa cheia | Folga de 1 mm; coluna até o fundo do pedestal; coluna impressa deitada |
+| O servo pode não cortar um grão duro | Borda de faca; recuar e tentar de novo; teste no M4 |
+| Batentes da balança altos demais | Batentes reguláveis, ajustados com 5 kg |
+| Tampo da capa no limite com o gato em cima | Nervuras ou 4–5 mm |
+| Tomba com ~3 N de lado | Cantoneira na parede, ou base de MDF de 40 × 30 cm |
+| A comporta aguenta ~54× a força do servo travado (elementos finitos) | Comporta com 20% de preenchimento e 4 perímetros; paredes cheias no encaixe do eixo |
+| A espessura é limitada pelo grão, não pela força | Espessura = 1,2 × a maior medida do grão (10 mm para grão de 8 mm); duas espessuras no kit do M4 |
 
 ---
 
@@ -476,6 +713,7 @@ Precisa da placa real; o Wokwi não serve aqui.
 - [ ] Descobrir os ângulos reais: o braço não encaixa exatamente no zero. Anotar `anguloEncher` e `anguloServir`.
 - [ ] Escrever `servir(n)` com a máquina de estados da seção 3.3, sem bloquear o loop.
 - [ ] Rodar 100 ciclos seguidos olhando o Serial Monitor.
+- [ ] Medir com o multímetro, com o servo forçando contra a mão por 1 s: borne em pelo menos 4,5 V e pino 3V3 em pelo menos 3,2 V (seção 3.4.1). Anotar também a tensão da fonte em vazio.
 - [ ] Ajustar a velocidade: rápido o bastante para soltar a ração, devagar o bastante para não assustar o gato.
 
 **No simulador antes:** a máquina de estados e o `servir(n)` inteiros. **Só na placa:** alimentação, reinício, ângulos reais e barulho.
@@ -584,7 +822,8 @@ Desde 30/10/2026, a interface é um PWA servido pelo servidor Fastify, com HTTPS
 - [ ] Claude modela o revestimento: pedestal (2 metades + fundo), prato da balança com batentes, capa da torre (2 metades, frente removível), coluna da tampa e tampa articulada com o encaixe do sensor de nível.
 - [ ] Pedir orçamento por peso e imprimir (600–800 g; PLA serve, porque nada disso toca a ração).
 - [ ] Montar a eletrônica no pedestal: ESP32, mini protoboard, HX711, borne e capacitor. Uma gota de cola quente em cada jumper para ele não soltar com a vibração.
-- [ ] Montar a célula de carga no apoio e o prato em cima, conferindo a folga de 2 mm em volta e nos batentes. Refazer a tara e a calibração.
+- [ ] Montar a célula de carga no apoio e o prato em cima, conferindo a folga de 2 mm em volta. Regular os batentes com ~5 kg no prato até encostarem (seção 5.2). Refazer a tara e a calibração.
+- [ ] Encostar o dispenser na parede e prender a coluna da tampa com a cantoneira (ou parafusar o pedestal na base de MDF).
 - [ ] Passar os cabos do servo e do sensor de nível por dentro da coluna e da coluna da tampa. Nenhum fio pode aparecer por fora.
 - [ ] Passar o cabo da fonte pelo protetor espiral, rente ao chão e, se der, atrás de um móvel.
 - [ ] **Teste de tombamento:** com a garrafa cheia, empurrar o conjunto pela lateral e pela frente. Não pode tombar.
@@ -616,7 +855,7 @@ Desde 30/10/2026, a interface é um PWA servido pelo servidor Fastify, com HTTPS
 | Bolso não esvaziar todo em 60° | Média | Médio | M4 | Furo de saída maior, mais sacudidas, bolso levemente cônico |
 | ESP32 reiniciando quando o servo arranca | Média | Médio | M3 | Fonte de 3 A, capacitor, GND comum no borne, `detach()` |
 | Comprar o servo de 360° por engano | Média | Médio | Na compra / M3 | Conferir "180°" no anúncio; o segundo servo é reserva |
-| Conjunto tombar (46 cm, garrafa cheia no alto) | Média | Alto | M9 | Pedestal pesado embaixo e pés de borracha; se precisar, um lastro dentro do pedestal ou garrafa de 1,5 L |
+| Conjunto tombar (46 cm, garrafa cheia no alto) | **Alta**: tomba com ~3 N de lado (seção 5.2) | Alto | M9 | Cantoneira na parede; sem furar, base de MDF de 40 × 30 cm. Lastro e pés na borda ajudam pouco |
 | Gato mexer no bico pela fenda da capa | Baixa | Baixo | M9 | Fenda mais estreita ou uma aba na frente dela |
 | Balança instável (gato apoiando, temperatura) | Média | Médio | M5 / M9 | Só confiar em leitura parada, tara periódica com a tigela vazia, batentes contra sobrecarga |
 | Leitura do nível errada com a garrafa quase vazia | Média | Baixo | M5 | Estreitar o feixe (`setROISize`); a balança confirma quando acabou de verdade |
@@ -702,3 +941,6 @@ dispenser/
 | 29/10/2026 | Versão revestida: capa estilo cafeteira, pedestal com a eletrônica, tigela a ~10 cm do chão, sem fio exposto (cabo de 5 V num protetor espiral). Segurança com balança na tigela (HX711) e sensor de nível na tampa (VL53L1X). Comporta passa a girar 60°. Lista de compras e custos atualizados. |
 | 29/10/2026 | Nova seção 4.6 com os links de compra de cada item, o preço visto e o que conferir no anúncio, e a ordem de compra sugerida. |
 | 30/10/2026 | Entra um servidor Fastify + MongoDB com DDD (D18), como companheiro do ESP32, que continua decidindo sozinho. Conversa por MQTT (D19). O PWA sai do LittleFS e passa a ser servido pelo servidor, com HTTPS (D11); a API `/v1` também vai para o servidor. Avisos por notificação push, com o Telegram em espera (D13, M8). M6 reescrito e M7 movido para o novo [roteiro do sistema](ROTEIRO-SISTEMA.md). |
+| 04/11/2026 | Nova seção 3.4.1 com o cálculo de tensão e corrente do modelo de garrafa: consumo de cada peça, calor no regulador, queda nos fios, capacitor e gasto de energia. Medição de tensão acrescentada ao M3. |
+| 04/11/2026 | Nova seção 5.2 com o cálculo mecânico: estresse na coluna e no braço, flexão, servo contra grão preso, célula de carga e tombamento. Folga garganta–comporta passa a 1 mm, batentes da balança reguláveis, e entram a cantoneira na parede e o risco de tombar como Alto. |
+| 04/11/2026 | Análise de elementos finitos da comporta (seção 5.2, itens 7 e 8): segurança de ~54× com o servo travado; espessura mínima limitada pelo grão (1,2 × a maior medida, 10 mm para grão de 8 mm). |
