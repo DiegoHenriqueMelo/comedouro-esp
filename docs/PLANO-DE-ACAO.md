@@ -62,7 +62,7 @@
 | D16 | Compras | Mercado Livre para começar já; AliExpress só no que fica bem mais barato | Poucos itens; o frete longo não segura o projeto |
 | D17 | Revestimento | Capa no estilo cafeteira, pedestal com a eletrônica dentro e tigela no alto (borda a ~10 cm do chão) | Nenhum fio nem peça móvel ao alcance do gato, e uma altura mais confortável para ele comer |
 | D18 | Servidor | Fastify + MongoDB com DDD e TDD, como **companheiro** do ESP32 ([roteiro do sistema](ROTEIRO-SISTEMA.md)) | Aprender backend num domínio real; configuração, histórico longo e avisos num lugar só. O ESP32 continua decidindo sozinho: com o servidor fora do ar, o gato come |
-| D19 | Conversa ESP32 ↔ servidor | MQTT com Mosquitto; o ESP32 abre a conexão. Confirmar na E9 do roteiro | Configuração retida no broker, aviso de "offline" de graça e entrega garantida dos eventos |
+| D19 | Conversa ESP32 ↔ servidor | MQTT; o ESP32 abre a conexão. O broker roda dentro do servidor. O contrato está em [protocolo-mqtt.md](protocolo-mqtt.md) | Configuração retida no broker, aviso de "offline" de graça e entrega garantida dos eventos |
 
 ---
 
@@ -312,7 +312,7 @@ A regra mais importante: **`lib/core` não inclui `Arduino.h`.** Recebe a hora c
 | HX711 (bogde) | Balança | Tara com a tigela vazia, calibração com um peso conhecido, média de 10 leituras |
 | VL53L1X (Pololu) | Sensor de nível | `setROISize` estreita o feixe para ele não enxergar as paredes da garrafa |
 | ESPAsyncWebServer + AsyncTCP | Servidor web do Espalexa | Use o fork mantido **ESP32Async** |
-| PubSubClient | MQTT com o servidor (M6) | O buffer padrão é pequeno para a configuração: aumente com `setBufferSize` |
+| espMqttClient (ou o cliente MQTT do ESP-IDF) | MQTT com o servidor (M6) | Precisa publicar em QoS 1. A PubSubClient só publica em QoS 0, e um evento pode se perder. A configuração tem cerca de 600 bytes: confira o buffer |
 | ArduinoJson (v7) | JSON das mensagens MQTT | — |
 | Espalexa | Alexa | `#define ESPALEXA_ASYNC` antes do include e `espalexa.begin(&server)` |
 | WiFiManager (tzapu) | Portal cativo | Pode conflitar com o AsyncWebServer na compilação (enum `HTTP_GET` duplicado). Teste no M6; se der conflito, troque por ESPAsyncWiFiManager |
@@ -941,6 +941,7 @@ dispenser/
 | 29/10/2026 | Versão revestida: capa estilo cafeteira, pedestal com a eletrônica, tigela a ~10 cm do chão, sem fio exposto (cabo de 5 V num protetor espiral). Segurança com balança na tigela (HX711) e sensor de nível na tampa (VL53L1X). Comporta passa a girar 60°. Lista de compras e custos atualizados. |
 | 29/10/2026 | Nova seção 4.6 com os links de compra de cada item, o preço visto e o que conferir no anúncio, e a ordem de compra sugerida. |
 | 30/10/2026 | Entra um servidor Fastify + MongoDB com DDD (D18), como companheiro do ESP32, que continua decidindo sozinho. Conversa por MQTT (D19). O PWA sai do LittleFS e passa a ser servido pelo servidor, com HTTPS (D11); a API `/v1` também vai para o servidor. Avisos por notificação push, com o Telegram em espera (D13, M8). M6 reescrito e M7 movido para o novo [roteiro do sistema](ROTEIRO-SISTEMA.md). |
+| 12/11/2026 | O servidor e o PWA ficaram prontos (etapas E0 a E10 do roteiro; E11 a E13 dependem de passos no celular e na rede). O broker MQTT passou a rodar dentro do servidor (D19), o contrato com o firmware está em [protocolo-mqtt.md](protocolo-mqtt.md), e a biblioteca MQTT sugerida para o firmware mudou para uma que publica em QoS 1. Para instalar e usar, veja o [guia](GUIA.md). |
 | 04/11/2026 | Nova seção 3.4.1 com o cálculo de tensão e corrente do modelo de garrafa: consumo de cada peça, calor no regulador, queda nos fios, capacitor e gasto de energia. Medição de tensão acrescentada ao M3. |
 | 04/11/2026 | Nova seção 5.2 com o cálculo mecânico: estresse na coluna e no braço, flexão, servo contra grão preso, célula de carga e tombamento. Folga garganta–comporta passa a 1 mm, batentes da balança reguláveis, e entram a cantoneira na parede e o risco de tombar como Alto. |
 | 04/11/2026 | Análise de elementos finitos da comporta (seção 5.2, itens 7 e 8): segurança de ~54× com o servo travado; espessura mínima limitada pelo grão (1,2 × a maior medida, 10 mm para grão de 8 mm). |
