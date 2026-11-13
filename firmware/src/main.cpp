@@ -14,6 +14,7 @@ const int GREEN_PIN = 26;
 const int LED_ON = LOW;
 const int LED_OFF = HIGH;
 const int CAT_SENSOR_PIN = 27;
+const int BUZZER_PIN = 23;
 unsigned long lastBlinkAt = 0;
 bool boardLedOn = false;
 int lastButtonState = HIGH;
@@ -27,6 +28,8 @@ int levelPercent = 100;
 int lastCatState = HIGH;
 int catVisit = 0;
 unsigned long catArrivedAt = 0;
+bool beeping = false;
+unsigned long beepStartedAt = 0;
 
 void showColor(int pin)
 {
@@ -50,6 +53,12 @@ void updateStatusLed()
   }
 }
 
+void startBeep(){
+  digitalWrite(BUZZER_PIN, HIGH);
+  beeping = true;
+  beepStartedAt = millis();
+}
+
 void requestDispense()
 {
   if (serving)
@@ -62,6 +71,7 @@ void requestDispense()
     serving = true;
     servingStartedAt = millis();
     digitalWrite(EXTERNAL_LED_PIN, LED_ON);
+    startBeep();
     Serial.print("Contador de Porções: ");
     Serial.println(pressCount);
   }
@@ -86,6 +96,7 @@ void setup()
   pinMode(RED_PIN, OUTPUT);
   pinMode(GREEN_PIN, OUTPUT);
   pinMode(CAT_SENSOR_PIN, INPUT);
+  pinMode(BUZZER_PIN, OUTPUT);
   digitalWrite(RED_PIN, LED_OFF);
   digitalWrite(GREEN_PIN, LED_OFF);
   digitalWrite(EXTERNAL_LED_PIN, LED_OFF);
@@ -164,5 +175,13 @@ void loop()
     Serial.println("%");
   }
   updateStatusLed();
+  if (beeping && millis() - beepStartedAt >=150){
+    digitalWrite(BUZZER_PIN, LOW);
+    beeping = false;
+  }
+  {
+    /* code */
+  }
+  
   lastButtonState = buttonState;
 }
