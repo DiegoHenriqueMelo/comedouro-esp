@@ -1,0 +1,9 @@
+.git
+.vscode
+docs
+firmware
+**/node_modules
+**/dist
+**/.env
+**/.env.*
+*.log

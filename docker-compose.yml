@@ -1,0 +1,29 @@
+# Sobe o sistema inteiro: `docker compose up -d --build`. Configuração no arquivo `.env` (ver docs/GUIA.md).
+services:
+  mongo:
+    image: mongo:8
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:27017:27017" # só para este computador: testes e backup
+    volumes:
+      - mongo-data:/data/db
+
+  server:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      - mongo
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      MONGO_URL: mongodb://mongo:27017
+      PORT: "3000"
+      HOST: 0.0.0.0
+      WEB_DIST: /app/web/dist
+    ports:
+      - "3000:3000" # API e PWA
+      - "1883:1883" # broker MQTT embutido: é aqui que o ESP32 conecta
+
+volumes:
+  mongo-data:
