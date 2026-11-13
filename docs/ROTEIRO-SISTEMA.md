@@ -2,9 +2,9 @@
 
 > Trilha guiada do software que roda fora do ESP32: servidor Fastify com DDD, MongoDB, conversa com o ESP32 por MQTT e PWA instalado no celular.
 > Complementa o [PLANO-DE-ACAO.md](PLANO-DE-ACAO.md). Começada em 30/10/2026.
-> **Formato:** mentoria com TDD. Você escreve os testes e o código; o Claude explica o conceito, define o que testar e revisa. O método está em [mentoria.md](mentoria.md).
+> **Formato:** mentoria com TDD. Você escreve os testes e o código; o Claude explica o conceito, define o que testar e revisa. O método está em [mentoria.md](mentoria.md). A mentoria valeu da E0 até a metade da E3. Em 10/11/2026, a pedido do usuário, o Claude implementou o restante.
 >
-> **Progresso (05/11/2026):** E0, E1 e E2 concluídas. E3 em andamento, com 7 de 10 itens prontos; o próximo são as regras no outro sentido (trocar a configuração). São 51 testes passando. A tabela da seção 5 mostra a situação de cada etapa.
+> **Progresso (12/11/2026):** E0 a E10 concluídas. E11, E12 e E13 têm o código pronto e dependem de passos seus: HTTPS com Tailscale, teste da notificação no celular, IP reservado e backup agendado. São 166 testes no servidor e 25 no app. Para instalar e usar, veja o [guia](GUIA.md).
 
 ---
 
@@ -35,7 +35,7 @@ E uma coisa ele **não** faz: decidir se o gato come. A agenda, o limite diário
 | S4 | Banco | MongoDB com o driver oficial, sem Mongoose | Os dados são documentos (configuração, agenda, eventos). Sem Mongoose, a tradução entre entidade e documento fica explícita no repositório, e não sobram dois "modelos" competindo. O Redis fica de fora: é ótimo para cache e fila, mas fraco como banco principal |
 | S5 | Testes | Vitest, com TDD. Rotas testadas com `app.inject()`; repositórios com uma suíte de contrato que roda contra a versão em memória e a do Mongo | Teste rápido, sem abrir porta e sem mock de biblioteca |
 | S6 | Validação | Zod na borda HTTP, para a **forma** do dado (400). Regras no domínio, para o **sentido** do dado (422) | Cada camada valida o que é dela |
-| S7 | Conversa com o ESP32 | MQTT com Mosquitto, e o ESP32 é quem abre a conexão. Confirmar na E9 | Configuração retida no broker, aviso de "offline" de graça (last will) e entrega garantida dos eventos (QoS 1). Funciona com o servidor em casa ou na nuvem |
+| S7 | Conversa com o ESP32 | MQTT, e o ESP32 é quem abre a conexão. O broker roda dentro do próprio servidor (biblioteca aedes); um Mosquitto externo também funciona | Configuração retida no broker, aviso de "offline" de graça (last will) e entrega garantida dos eventos (QoS 1). Funciona com o servidor em casa ou na nuvem |
 | S8 | Interface | PWA em React + Vite + TS, com `vite-plugin-pwa`. Em produção, servido pelo próprio Fastify | Mesma origem da API, então não precisa de CORS |
 | S9 | Linguagem do código | Mudou na E2: identificadores em inglês (`Feeder`, `Portion`, `Timing`, `ScheduledMeal`, `Configuration`); nomes de teste, comentários e mensagens em português. Pendente: `ErroDeDominio`, `codigo` e os códigos de erro ainda estão em português | Escolha do usuário. O glossário liga cada termo ao nome no código |
 | S10 | Pacotes | pnpm | Já está instalado |
@@ -73,17 +73,21 @@ domain ─► nada
 
 ```
 <repositório do sistema>/
-├── docker-compose.yml       # mongo (E6) e mosquitto (E9)
-├── docs/                    # glossário (E1), protocolo MQTT (E9)
+├── docker-compose.yml       # o servidor e o MongoDB
+├── Dockerfile               # a imagem do servidor, com o PWA dentro
+├── .env.example             # a configuração, explicada
+├── docs/                    # guia, glossário, protocolo MQTT, roteiro e plano
 ├── server/
 │   ├── src/
 │   │   ├── domain/          # regras puras: nada de Fastify, Mongo ou Date.now()
 │   │   ├── application/     # casos de uso e portas (interfaces)
-│   │   ├── infra/           # adaptadores: memoria/, mongo/, mqtt/, simulador/, push/
+│   │   ├── infra/           # adaptadores: memory/, mongo/, mqtt/, simulated/, push/
 │   │   ├── http/            # Fastify: rotas, schemas, tratamento de erro
+│   │   ├── simulator/       # o "ESP32 de mentira" (`pnpm simulador`)
+│   │   ├── composition.ts   # monta os casos de uso a partir dos adaptadores
+│   │   ├── config.ts        # lê as variáveis de ambiente
 │   │   ├── app.ts           # buildApp(deps): monta o Fastify; os testes usam isto
 │   │   └── main.ts          # raiz de composição: cria as dependências reais e sobe
-│   ├── simulador/           # o "ESP32 de mentira" (E9)
 │   └── package.json
 └── web/                     # PWA (E10)
 ```
@@ -123,17 +127,17 @@ Nenhuma etapa precisa de peça: o roteiro inteiro roda no PC, em paralelo ao har
 | E0 | Ambiente e esqueleto | 2–3 | ✅ Concluída |
 | E1 | Glossário e modelo no papel | 1–2 | ✅ Concluída |
 | E2 | Value objects: `Horario` e `Porcoes` (no código: `Timing` e `Portion`) | 2–3 | ✅ Concluída |
-| E3 | Agregado `Alimentador` (no código: `Feeder`): configuração e agenda | 4–6 | 🟡 Em andamento: 7 de 10 itens. Próximo: trocar a configuração |
-| E4 | Casos de uso e repositório em memória | 3–4 | ⬜ |
-| E5 | Fastify: `/v1/config` e `/v1/schedules` | 4–6 | ⬜ |
-| E6 | MongoDB | 4–6 | ⬜ |
-| E7 | Porta `Dispositivo` e "servir agora" | 4–6 | ⬜ |
-| E8 | Eventos, histórico e status | 4–6 | ⬜ |
-| E9 | MQTT e o "ESP32 de mentira" | 8–12 | ⬜ |
-| E10 | PWA: as telas | 12–20 | ⬜ |
-| E11 | PWA no celular (HTTPS) | 2–4 | ⬜ |
-| E12 | Avisos por notificação push | 4–6 | ⬜ |
-| E13 | Deploy | 3–6 | ⬜ |
+| E3 | Agregado `Alimentador` (no código: `Feeder`): configuração e agenda | 4–6 | ✅ Concluída |
+| E4 | Casos de uso e repositório em memória | 3–4 | ✅ Concluída |
+| E5 | Fastify: `/v1/config` e `/v1/schedules` | 4–6 | ✅ Concluída |
+| E6 | MongoDB | 4–6 | ✅ Concluída |
+| E7 | Porta `Dispositivo` e "servir agora" | 4–6 | ✅ Concluída |
+| E8 | Eventos, histórico e status | 4–6 | ✅ Concluída |
+| E9 | MQTT e o "ESP32 de mentira" | 8–12 | ✅ Concluída, com broker embutido no lugar do Mosquitto |
+| E10 | PWA: as telas | 12–20 | ✅ Concluída, sem o pacote `contratos` |
+| E11 | PWA no celular (HTTPS) | 2–4 | 🟡 Código pronto. Falta o HTTPS com Tailscale e instalar no celular |
+| E12 | Avisos por notificação push | 4–6 | 🟡 Código pronto. Falta testar a notificação no celular |
+| E13 | Deploy | 3–6 | 🟡 Docker pronto e testado. Falta o IP reservado e o backup agendado |
 
 ### E0 — Ambiente e esqueleto · 2–3 h
 
@@ -197,34 +201,30 @@ Nenhuma etapa precisa de peça: o roteiro inteiro roda no PC, em paralelo ao har
 - [x] recusa dois horários iguais (`horario_repetido`) — R2
 - [x] recusa uma agenda cujas porções ativas somam mais que o limite diário (`agenda_acima_do_limite`). Horário desativado não entra na soma — R5
 - [x] recusa dois horários ativos mais próximos que o intervalo mínimo, inclusive passando pela meia-noite (`horarios_muito_proximos`) — R6
-- [ ] **← próximo:** as mesmas regras valem no outro sentido: baixar o limite diário ou aumentar o intervalo mínimo de um jeito que invalida a agenda atual também é recusado
-- [ ] recusa `anguloEncher` igual a `anguloServir`, ou fora de 0–180 — R12
+- [x] as mesmas regras valem no outro sentido: baixar o limite diário ou aumentar o intervalo mínimo de um jeito que invalida a agenda atual também é recusado
+- [x] recusa `anguloEncher` igual a `anguloServir`, ou fora de 0–180 — R12
 - [x] uma mudança recusada não altera nada: nem a agenda, nem a versão
-- [ ] toda mudança aceita registra o evento `ConfiguracaoAlterada` com a versão nova
+- [x] toda mudança aceita registra o evento `ConfiguracaoAlterada` com a versão nova
 
 **Pronto quando:** tudo verde, e não há como deixar o alimentador inválido pelo lado de fora: sem setter público e sem array exposto em que dê para fazer `push`.
 
-> 🟡 **Em andamento.** O que já está feito:
-> - `Feeder` com `create()`, os getters `version`, `schedule` (devolve cópia) e `configuration`, e `replaceSchedule()`, que valida tudo antes de mudar;
-> - `ScheduledMeal` com `active` (padrão `true`), com teste próprio;
-> - `Configuration.default()`;
-> - teste "mexer na lista devolvida não muda a agenda".
->
-> Ainda falta: a validação dos campos da configuração (R7 a R11), que entra junto com o "outro sentido", quando existir um método para trocar a configuração.
+> ✅ **Concluída em 10/11/2026.** O usuário fez a base do agregado e as regras R1, R2, R5 e R6, no modo guiado. O Claude fechou o restante a pedido: a validação dos campos da configuração (R7 a R12), o `replaceConfiguration`, o evento `ConfiguracaoAlterada` e o `restore`, que o repositório usa para recriar um alimentador salvo.
 
 ### E4 — Casos de uso e repositório em memória · 3–4 h
+
+> ✅ **Concluída** (feita pelo Claude, a pedido). No código: `FeederService`, em `application/feeder-service.ts`.
 
 **Conceito:** a camada de aplicação orquestra: carrega, deixa o domínio decidir, salva e publica os eventos. As **portas** são interfaces que a aplicação define e a infraestrutura implementa (inversão de dependência). Nos testes, use **fakes** em memória, não mocks de biblioteca.
 
 **Portas:** `AlimentadorRepository`, `Relogio` e `PublicadorDeEventos`.
 
 **Testes:**
-- [ ] `ObterAlimentador`, na primeira execução, cria o alimentador padrão e o salva
-- [ ] `AtualizarAgenda` com agenda válida salva e devolve a versão nova
-- [ ] `AtualizarAgenda` com agenda inválida devolve o erro do domínio e não salva nada
-- [ ] `AtualizarConfiguracao`, com os mesmos dois casos
-- [ ] os eventos do agregado chegam ao `PublicadorDeEventos` **depois** de salvar, nunca antes nem quando a gravação falha
-- [ ] `atualizadoEm` vem do `Relogio`; nos testes, um `RelogioFixo`
+- [x] `ObterAlimentador`, na primeira execução, cria o alimentador padrão e o salva
+- [x] `AtualizarAgenda` com agenda válida salva e devolve a versão nova
+- [x] `AtualizarAgenda` com agenda inválida devolve o erro do domínio e não salva nada
+- [x] `AtualizarConfiguracao`, com os mesmos dois casos
+- [x] os eventos do agregado chegam ao `PublicadorDeEventos` **depois** de salvar, nunca antes nem quando a gravação falha
+- [ ] `atualizadoEm` vem do `Relogio`; nos testes, um `RelogioFixo` — **não feito:** o MongoDB grava a data da alteração, mas o agregado não a expõe
 
 **Pronto quando:** os casos de uso rodam nos testes só com adaptadores em memória.
 
@@ -232,32 +232,36 @@ Nenhuma etapa precisa de peça: o roteiro inteiro roda no PC, em paralelo ao har
 
 ### E5 — Fastify: `/v1/config` e `/v1/schedules` · 4–6 h
 
+> ✅ **Concluída.** A validação da forma usa o Zod direto nas rotas (`http/routes.ts`), sem o type provider.
+
 **Conceito:** `buildApp(deps)` recebe as dependências prontas, então o mesmo app roda nos testes com fakes e no `main.ts` com os adaptadores reais. Plugins e encapsulamento do Fastify, type provider do Zod e um `setErrorHandler` central. Erro de forma (Zod) é 400; regra do domínio é 422.
 
 **Testes, com `app.inject()` e sem abrir porta:**
-- [ ] `GET /v1/schedules` → 200 com a agenda
-- [ ] `PUT /v1/schedules` válido → 200 com a versão nova
-- [ ] `PUT` com `porcoes: "dois"` → 400
-- [ ] `PUT` com 9 horários → 422 e `{ "motivo": "agenda_cheia" }`
-- [ ] `GET` e `PUT /v1/config`, com os mesmos critérios
-- [ ] um erro inesperado vira 500 com mensagem genérica: sem stack no corpo, mas registrado no log
-- [ ] o `main.ts` monta tudo com os adaptadores em memória
+- [x] `GET /v1/schedules` → 200 com a agenda
+- [x] `PUT /v1/schedules` válido → 200 com a versão nova
+- [x] `PUT` com `porcoes: "dois"` → 400
+- [x] `PUT` com 9 horários → 422 e `{ "motivo": "agenda_cheia" }`
+- [x] `GET` e `PUT /v1/config`, com os mesmos critérios
+- [x] um erro inesperado vira 500 com mensagem genérica: sem stack no corpo, mas registrado no log
+- [x] o `main.ts` monta tudo com os adaptadores em memória
 
 **Pronto quando:** dá para ler e mudar a agenda e a configuração pelo Bruno, e os testes de rota passam.
 
 ### E6 — MongoDB · 4–6 h
 
+> ✅ **Concluída.** A suíte de contrato (`infra/repository-contract.test.ts`) roda contra a memória e contra um MongoDB de verdade. Sem banco no ar, os 14 testes do Mongo são pulados.
+
 **Conceito:** o repositório devolve o **agregado inteiro**, nunca o documento. Um mapper explícito traduz os dois lados, e o `_id` do Mongo não vaza para o domínio. A concorrência otimista usa a `versao`: só grava se a versão no banco for a esperada; caso contrário, é conflito. A **suíte de contrato** é uma função de testes que recebe uma fábrica de repositório e roda igual para a versão em memória e para a do Mongo.
 
-- [ ] `docker-compose.yml` na raiz de `dispenser/`, com a imagem oficial do Mongo e um volume nomeado
-- [ ] `MongoAlimentadorRepository` com o driver oficial
-- [ ] suíte de contrato rodando nos dois repositórios:
+- [x] `docker-compose.yml` na raiz de `dispenser/`, com a imagem oficial do Mongo e um volume nomeado
+- [x] `MongoAlimentadorRepository` com o driver oficial
+- [x] suíte de contrato rodando nos dois repositórios:
   - salvar e carregar devolve um alimentador igual
   - carregar o que não existe devolve `null`
   - dois "carrega → altera → salva" em paralelo: o segundo falha com `conflito_de_versao`
-- [ ] na HTTP, `conflito_de_versao` vira 409
-- [ ] o `main.ts` usa o Mongo quando existe `MONGO_URL` e a memória quando não existe
-- [ ] testes do Mongo num banco separado (`dispenser_test`), limpo antes de cada teste
+- [x] na HTTP, `conflito_de_versao` vira 409
+- [x] o `main.ts` usa o Mongo quando existe `MONGO_URL` e a memória quando não existe
+- [x] testes do Mongo num banco separado (`dispenser_test`), limpo antes de cada teste
 
 **Pronto quando:** reiniciar o servidor mantém a agenda, e a suíte de contrato passa nos dois repositórios.
 
@@ -265,10 +269,12 @@ Nenhuma etapa precisa de peça: o roteiro inteiro roda no PC, em paralelo ao har
 
 ### E7 — Porta `Dispositivo` e "servir agora" · 4–6 h
 
+> ✅ **Concluída.** No código: `SimulatedDevice` e `InProcessDevice`, em `infra/simulated/`.
+
 **Conceito:** o ESP32 é um sistema externo com a própria linguagem. A porta `Dispositivo` fala a língua do domínio, e o adaptador traduz (camada anticorrupção). O primeiro adaptador é um **dispositivo simulado** em memória, com as mesmas regras do firmware. Ele não é regra do servidor: é um dublê do ESP32 e, de quebra, a implementação de referência do `lib/core/guard` do M5.
 
-- [ ] porta `Dispositivo`: `servir(porcoes, { forcar, origem })` devolve `aceito`, `recusado(motivo)`, `ocupado` ou `offline`
-- [ ] `DispositivoSimulado`, com os testes do M5 que valem aqui:
+- [x] porta `Dispositivo`: `servir(porcoes, { forcar, origem })` devolve `aceito`, `recusado(motivo)`, `ocupado` ou `offline`
+- [x] `DispositivoSimulado`, com os testes do M5 que valem aqui:
   - recusa quando passaria do limite diário (`limite_diario`)
   - com intervalo mínimo de 30 min, um pedido 10 min depois de outro é recusado (`intervalo`)
   - recusa com a tigela acima do limite (`tigela_com_racao`), a não ser com `forcar`
@@ -276,36 +282,40 @@ Nenhuma etapa precisa de peça: o roteiro inteiro roda no PC, em paralelo ao har
   - a virada da meia-noite zera o contador do dia
   - um pedido enquanto serve devolve `ocupado`
   - nos testes, dá para colocar gramas na tigela e avançar o relógio
-- [ ] caso de uso `ServirAgora`, com origem `interface`
-- [ ] `POST /v1/feed`: aceito → 202; recusado → 429 com `{ motivo }`; ocupado → 409; offline → 503 com `{ "motivo": "alimentador_offline" }`
+- [x] caso de uso `ServirAgora`, com origem `interface`
+- [x] `POST /v1/feed`: aceito → 202; recusado → 429 com `{ motivo }`; ocupado → 409; offline → 503 com `{ "motivo": "alimentador_offline" }`
 
 **Pronto quando:** pelo Bruno, dá para servir, bater no limite e ver cada recusa com o motivo certo.
 
 ### E8 — Eventos, histórico e status · 4–6 h
 
+> ✅ **Concluída.** No código: `DeviceService`, em `application/device-service.ts`.
+
 **Conceito:** o que o dispositivo faz chega como **evento**, um fato consumado: o servidor registra, não decide. O ESP32 pode reenviar eventos depois de ficar sem conexão, então registrar precisa ser **idempotente**: o mesmo evento duas vezes vira uma linha só. Cada evento tem um `seq` crescente, dado pelo dispositivo.
 
-- [ ] `RegistrarEventoDoDispositivo` com os tipos `refeicao_servida`, `refeicao_recusada`, `refeicao_adiada`, `refeicao_pulada`, `garrafa_vazia` (o `VAZIO`), `sensor_sem_leitura` e `reiniciou`
-- [ ] o mesmo `seq` duas vezes grava uma vez
-- [ ] um evento que chega fora de ordem entra no lugar certo do histórico, ordenado pela hora do evento
-- [ ] `GET /v1/history?limit=50`, do mais recente para o mais antigo; `limit` acima de 200 → 400
-- [ ] `GET /v1/status`: o último estado informado pelo dispositivo (tigela, garrafa, sensores, online ou offline, versão da configuração aplicada) e o "hoje" (porções e gramas) calculado a partir do histórico
-- [ ] o "hoje" usa o fuso da configuração, não o do servidor: um evento às 22:30 de Brasília (01:30 UTC) conta no dia certo
-- [ ] repositório de eventos em memória e no Mongo, com a mesma ideia de suíte de contrato e um índice único em `{ dispositivoId, seq }`
+- [x] `RegistrarEventoDoDispositivo` com os tipos `refeicao_servida`, `refeicao_recusada`, `refeicao_adiada`, `refeicao_pulada`, `garrafa_vazia` (o `VAZIO`), `sensor_sem_leitura` e `reiniciou`
+- [x] o mesmo `seq` duas vezes grava uma vez
+- [x] um evento que chega fora de ordem entra no lugar certo do histórico, ordenado pela hora do evento
+- [x] `GET /v1/history?limit=50`, do mais recente para o mais antigo; `limit` acima de 200 → 400
+- [x] `GET /v1/status`: o último estado informado pelo dispositivo (tigela, garrafa, sensores, online ou offline, versão da configuração aplicada) e o "hoje" (porções e gramas) calculado a partir do histórico
+- [x] o "hoje" usa o fuso da configuração, não o do servidor: um evento às 22:30 de Brasília (01:30 UTC) conta no dia certo
+- [x] repositório de eventos em memória e no Mongo, com a mesma ideia de suíte de contrato e um índice único em `{ dispositivoId, seq }`
 
 **Pronto quando:** o dispositivo simulado gera refeições, e o histórico e o status batem com elas.
 
 ### E9 — MQTT e o "ESP32 de mentira" · 8–12 h
 
+> ✅ **Concluída.** O contrato está em [protocolo-mqtt.md](protocolo-mqtt.md). A tabela de tópicos abaixo era a proposta; o documento é o que vale.
+
 **Conceito:** publicar e assinar (pub/sub), broker, QoS 0 e 1, mensagem retida, last will (LWT) e sessão persistente. Pedido e resposta sobre MQTT, com um `id` de correlação e um prazo.
 
-- [ ] Mosquitto no `docker-compose.yml`, com usuário e senha
-- [ ] Fechar o contrato de tópicos (proposta abaixo) em `docs/protocolo-mqtt.md`. É ele que o firmware segue no M6
-- [ ] `MqttDispositivo` implementando a mesma porta da E7, sem mudar nenhum teste do `ServirAgora`
-- [ ] Simulador como processo separado (`pnpm simulador`), conectado ao Mosquitto como se fosse o ESP32 e reaproveitando as regras do `DispositivoSimulado`. Ele roda a agenda sozinho, manda eventos com `seq` e publica o estado de tempos em tempos. Uma opção de relógio acelerado ajuda nos testes
-- [ ] Cada `ConfiguracaoAlterada` publica a configuração **retida**. O dispositivo aplica e devolve a versão no estado, e o status mostra "sincronizado" ou "pendente"
-- [ ] Derrubar o simulador deixa o status offline (LWT). Ao religar, ele recebe a configuração retida e reenvia os eventos depois do `ultimoSeq`
-- [ ] Os comandos de manutenção da seção 3.5 do plano (tara, calibrar a balança, calibrar a dose, testar o servo, reconhecer o alerta) seguem o mesmo caminho do servir
+- [x] Mosquitto no `docker-compose.yml`, com usuário e senha — **trocado:** broker embutido no servidor (aedes), com usuário e senha; um Mosquitto externo ainda funciona pelo `MQTT_URL`
+- [x] Fechar o contrato de tópicos (proposta abaixo) em `docs/protocolo-mqtt.md`. É ele que o firmware segue no M6
+- [x] `MqttDispositivo` implementando a mesma porta da E7, sem mudar nenhum teste do `ServirAgora`
+- [x] Simulador como processo separado (`pnpm simulador`), conectado ao Mosquitto como se fosse o ESP32 e reaproveitando as regras do `DispositivoSimulado`. Ele roda a agenda sozinho, manda eventos com `seq` e publica o estado de tempos em tempos. Uma opção de relógio acelerado ajuda nos testes — o relógio acelerado não foi feito
+- [x] Cada `ConfiguracaoAlterada` publica a configuração **retida**. O dispositivo aplica e devolve a versão no estado, e o status mostra "sincronizado" ou "pendente"
+- [x] Derrubar o simulador deixa o status offline (LWT). Ao religar, ele recebe a configuração retida e reenvia os eventos depois do `ultimoSeq`
+- [x] Os comandos de manutenção da seção 3.5 do plano (tara, calibrar a balança, calibrar a dose, testar o servo, reconhecer o alerta) seguem o mesmo caminho do servir
 
 **Proposta de tópicos** (`{id}` é o identificador do alimentador):
 
@@ -323,54 +333,62 @@ Nenhuma etapa precisa de peça: o roteiro inteiro roda no PC, em paralelo ao har
 
 ### E10 — PWA: as telas · 12–20 h
 
+> ✅ **Concluída**, com duas diferenças: não existe o pacote `contratos`, e o erro 422 da agenda aparece numa mensagem com os horários envolvidos, não marcado no campo.
+
 **Conceito:** o PWA é só um cliente da API `/v1`. Os testes ficam na lógica (tradução de erros, fluxos), não nos pixels. A API é simulada nos testes com MSW.
 
-- [ ] Transformar `dispenser/` num workspace do pnpm com `server`, `web` e `contratos`. Os schemas Zod da API vão para `contratos`, e o servidor e o PWA usam os mesmos tipos
-- [ ] Projeto `web/` em React + Vite + TS, com o proxy do Vite apontando `/v1` para o Fastify
-- [ ] Telas:
+- [ ] Transformar `dispenser/` num workspace do pnpm com `server`, `web` e `contratos`. Os schemas Zod da API vão para `contratos`, e o servidor e o PWA usam os mesmos tipos — **não feito:** os tipos da API ficam em `web/src/api.ts`
+- [x] Projeto `web/` em React + Vite + TS, com o proxy do Vite apontando `/v1` para o Fastify
+- [x] Telas:
   1. **Início:** estado, online ou offline, última refeição, porções de hoje contra o limite, peso na tigela, nível da garrafa em % e em dias, e o botão "servir agora", que vira "servir mesmo assim" quando a tigela tem ração.
   2. **Agenda:** horários com porções, ativar e desativar, no máximo 8, e o aviso "sincronizado" ou "pendente".
   3. **Histórico:** hora, porções, gramas, origem (agenda, interface, Alexa) e resultado.
   4. **Ajustes:** gramas por porção, tara e calibração da balança, limite da tigela, limite diário, intervalo mínimo, altura da garrafa, ângulos do servo com botão de teste e fuso.
-- [ ] Testes primeiro:
+- [x] Testes primeiro:
   - cada `motivo` vira uma mensagem clara: "Limite de hoje atingido", "A tigela ainda tem 12 g", "Já está servindo", "O alimentador está offline"
   - com `tigela_com_racao`, o botão vira "servir mesmo assim" e manda `forcar: true`
   - um 422 da agenda aparece no horário que causou o erro
   - cada tela tem estado de carregando e de erro de rede
-- [ ] Em produção, o build do `web` é servido pelo Fastify com `@fastify/static`, e `/v1/*` continua sendo a API
+- [x] Em produção, o build do `web` é servido pelo Fastify com `@fastify/static`, e `/v1/*` continua sendo a API
 
 **Pronto quando:** dá para operar tudo pelo navegador do PC, com o simulador do outro lado.
 
 ### E11 — PWA no celular · 2–4 h
 
+> 🟡 **Falta a sua parte.** O manifest, os ícones, o service worker e o aviso de "sem conexão" estão prontos. Faltam o HTTPS com Tailscale, a instalação no celular e o Lighthouse. O passo a passo está na seção 6 do [guia](GUIA.md).
+
 **Conceito:** para instalar o PWA e registrar o service worker, o navegador exige HTTPS (ou `localhost`). O service worker guarda o "casco" do app (HTML, JS, CSS). A API passa sempre pela rede: um "servir" nunca pode sair do cache.
 
-- [ ] HTTPS. Recomendação: **Tailscale**. O `tailscale serve` dá um endereço `https://<máquina>.<sua-rede>.ts.net` com certificado válido; só os seus aparelhos acessam, e funciona pelo 4G sem abrir porta no roteador
-- [ ] `manifest` com nome, ícones de 192 e 512 px, `display: standalone` e cor do tema
-- [ ] Instalar na tela inicial. Aberto sem internet, o app mostra o aviso "sem conexão" no lugar da página de erro do navegador
-- [ ] Lighthouse aprovando o PWA como instalável
+- [ ] HTTPS. Recomendação: **Tailscale**. O `tailscale serve` dá um endereço `https://<máquina>.<sua-rede>.ts.net` com certificado válido; só os seus aparelhos acessam, e funciona pelo 4G sem abrir porta no roteador — **falta você fazer:** seção 6.1 do guia
+- [x] `manifest` com nome, ícones de 192 e 512 px, `display: standalone` e cor do tema
+- [ ] Instalar na tela inicial. Aberto sem internet, o app mostra o aviso "sem conexão" no lugar da página de erro do navegador — o aviso está pronto; **falta instalar no celular:** seção 6.2 do guia
+- [ ] Lighthouse aprovando o PWA como instalável — **não rodado**
 
 **Pronto quando:** o ícone está na tela inicial do celular e o app funciona fora de casa, pelo 4G.
 
 ### E12 — Avisos por notificação push · 4–6 h
 
+> 🟡 **Código pronto; falta testar no celular.** A inscrição, os seis avisos e a regra de um aviso por ocorrência têm testes. A entrega da notificação num aparelho de verdade depende do HTTPS da E11 e das chaves VAPID (seção 3.3 do guia). A decisão sobre o Telegram continua aberta até esse teste.
+
 **Decisão desta etapa:** se a notificação push funcionar no seu celular, os avisos ficam no servidor e o Telegram (M8) não entra. O ESP32 fica com menos código e menos memória ocupada. No Android funciona direto; no iPhone, só com o PWA instalado na tela inicial (iOS 16.4 ou mais novo).
 
-- [ ] Porta `Notificador`, com o adaptador de push (biblioteca `web-push`, chaves VAPID) e um em memória para os testes
-- [ ] Avisos do M8: garrafa abaixo de 20%, porção que não saiu (`VAZIO`), refeição pulada, sensor sem leitura, ESP32 reiniciado
-- [ ] Um aviso novo, que só existe com servidor: **alimentador offline há mais de 30 min**
-- [ ] Um aviso por ocorrência: o mesmo problema não notifica de novo a cada estado recebido
+- [x] Porta `Notificador`, com o adaptador de push (biblioteca `web-push`, chaves VAPID) e um em memória para os testes
+- [x] Avisos do M8: garrafa abaixo de 20%, porção que não saiu (`VAZIO`), refeição pulada, sensor sem leitura, ESP32 reiniciado
+- [x] Um aviso novo, que só existe com servidor: **alimentador offline há mais de 30 min**
+- [x] Um aviso por ocorrência: o mesmo problema não notifica de novo a cada estado recebido
 
 **Pronto quando:** com o celular bloqueado, chega a notificação "garrafa abaixo de 20%" quando o simulador baixa o nível.
 
 ### E13 — Deploy · 3–6 h
 
+> 🟡 **Docker pronto e testado nesta máquina:** o compose inteiro subiu, o simulador conectou de fora, e os dados sobreviveram a um reinício do servidor. Faltam o IP reservado no roteador e o agendamento do backup.
+
 **Decisão desta etapa:** onde o servidor roda. Recomendação: **em casa** (PC que fica ligado, Raspberry Pi, mini PC ou notebook velho) com Tailscale. O ESP32 conversa com o broker na rede local, sem TLS, o que economiza memória dele, e nada fica exposto na internet. A nuvem só faz sentido se não houver nenhuma máquina ligada 24 h; nesse caso, o broker precisa de TLS e senha.
 
-- [ ] `Dockerfile` do servidor em múltiplos estágios, e um compose com servidor, Mongo e Mosquitto, todos com `restart: unless-stopped`
-- [ ] IP reservado no roteador para a máquina do servidor, porque o ESP32 precisa achar o broker
-- [ ] Backup diário do Mongo com `mongodump`
-- [ ] Senhas e chaves em variáveis de ambiente, fora do git
+- [x] `Dockerfile` do servidor em múltiplos estágios, e um compose com servidor, Mongo e Mosquitto, todos com `restart: unless-stopped` — sem o Mosquitto: o broker é embutido
+- [ ] IP reservado no roteador para a máquina do servidor, porque o ESP32 precisa achar o broker — **falta você fazer** (seção 7 do guia)
+- [ ] Backup diário do Mongo com `mongodump` — **não agendado:** o comando manual está na seção 8 do guia, e foi testado
+- [x] Senhas e chaves em variáveis de ambiente, fora do git
 
 **Pronto quando:** o servidor volta sozinho depois de reiniciar a máquina, e o celular acessa pelo 4G.
 
@@ -390,3 +408,4 @@ Nenhuma etapa precisa de peça: o roteiro inteiro roda no PC, em paralelo ao har
 |---|---|
 | 30/10/2026 | Roteiro criado: servidor Fastify com DDD e MongoDB como companheiro do ESP32, que continua autônomo; MQTT entre os dois; PWA servido pelo servidor. Formato de mentoria com TDD. |
 | 03/11/2026 | Progresso marcado: E0 a E2 concluídas e E3 em andamento (R1 e R2 prontas). A S9 passou a refletir os nomes em inglês no código. O método de mentoria foi para o [mentoria.md](mentoria.md). |
+| 12/11/2026 | A pedido do usuário, o Claude implementou o restante do sistema: o fim da E3 e as etapas E4 a E13. Diferenças em relação ao roteiro: broker MQTT embutido no servidor no lugar do Mosquitto, sem o pacote `contratos`, e Zod direto nas rotas. Entraram o [guia de uso e configuração](GUIA.md) e o [protocolo MQTT](protocolo-mqtt.md). |
