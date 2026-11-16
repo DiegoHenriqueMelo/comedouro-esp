@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { api, type Config } from "../api";
+import { api, type Config, type User } from "../api";
 import { useAction, useLoad } from "../hooks";
 import { fieldFor, messageFor } from "../messages";
 import { disablePush, enablePush, getPushState, type PushState } from "../push";
+import { signOut } from "../session";
 import {
   Card,
   FeedbackLine,
@@ -82,7 +83,7 @@ export function fromForm(form: Form): Config | { invalid: NumericKey } {
   return config;
 }
 
-export function SettingsPage() {
+export function SettingsPage(props: { user?: User }) {
   const saved = useLoad(api.config);
   const status = useLoad(api.status, 5000);
   const [form, setForm] = useState<Form | null>(null);
@@ -222,6 +223,7 @@ export function SettingsPage() {
       <Maintenance form={form} />
       <Notifications />
       {status.data?.simulado && <Simulator onDone={status.reload} />}
+      {props.user && <Account user={props.user} />}
 
       <p className="legend center">
         Configuração na versão {saved.data.versao}
@@ -348,6 +350,40 @@ const PUSH_TEXT: Record<PushState, string> = {
   desativado: "As notificações estão desativadas neste aparelho.",
   ativado: "Este aparelho recebe os avisos do comedouro.",
 };
+
+export function Account(props: { user: User }) {
+  const action = useAction();
+
+  return (
+    <Card title="Sua conta">
+      <div className="account">
+        {props.user.foto && (
+          <img
+            className="account-photo"
+            src={props.user.foto}
+            alt=""
+            referrerPolicy="no-referrer"
+          />
+        )}
+        <div className="list-text">
+          <span>{props.user.nome}</span>
+          <span className="legend">{props.user.email}</span>
+        </div>
+      </div>
+      <FeedbackLine feedback={action.feedback} />
+      <button
+        type="button"
+        className="button"
+        disabled={action.busy}
+        onClick={() =>
+          void action.run(signOut, { ok: "Você saiu.", error: messageFor })
+        }
+      >
+        {action.busy ? "Saindo…" : "Sair"}
+      </button>
+    </Card>
+  );
+}
 
 function Notifications() {
   const [state, setState] = useState<PushState | null>(null);

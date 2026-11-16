@@ -28,6 +28,12 @@ const MOTIVOS: Record<string, string> = {
     "Os ângulos vão de 0° a 180° e precisam ser diferentes entre si.",
   conflito_de_versao:
     "Outra pessoa alterou os dados ao mesmo tempo. Recarregue e tente de novo.",
+  // login
+  credencial_invalida: "O Google não confirmou a sua conta. Tente de novo.",
+  login_google_desligado:
+    "O login com Google não está configurado neste servidor.",
+  nao_autenticado: "Sua sessão terminou. Entre de novo.",
+  origem_invalida: "Pedido recusado por segurança. Recarregue a página.",
   // gerais
   requisicao_invalida: "Confira os campos preenchidos.",
   sem_conexao: "Sem conexão com o servidor.",

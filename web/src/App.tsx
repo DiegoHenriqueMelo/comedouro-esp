@@ -1,9 +1,13 @@
 import { useEffect, useState } from "react";
+import type { User } from "./api";
+import { messageFor } from "./messages";
 import { HistoryPage } from "./pages/HistoryPage";
 import { HomePage } from "./pages/HomePage";
+import { LoginPage } from "./pages/LoginPage";
 import { SchedulePage } from "./pages/SchedulePage";
 import { SettingsPage } from "./pages/SettingsPage";
-import { Icon, Notice } from "./ui";
+import { useSession } from "./session";
+import { Icon, LoadError, Loading, Notice } from "./ui";
 
 const TABS = [
   { id: "inicio", label: "Início" },
@@ -35,6 +39,28 @@ function useOnline(): boolean {
 }
 
 export function App() {
+  const session = useSession();
+  const { state } = session;
+
+  if (state.status === "dentro") return <SignedInApp user={state.user} />;
+  if (state.status === "fora") return <LoginPage onLogin={session.signedIn} />;
+  return (
+    <div className="app">
+      <main className="page">
+        {state.status === "carregando" ? (
+          <Loading />
+        ) : (
+          <LoadError
+            message={messageFor(state.error)}
+            onRetry={session.retry}
+          />
+        )}
+      </main>
+    </div>
+  );
+}
+
+function SignedInApp(props: { user: User }) {
   const [tab, setTab] = useState<TabId>(tabFromHash);
   const online = useOnline();
 
@@ -61,7 +87,7 @@ export function App() {
         {tab === "inicio" && <HomePage />}
         {tab === "agenda" && <SchedulePage />}
         {tab === "historico" && <HistoryPage />}
-        {tab === "ajustes" && <SettingsPage />}
+        {tab === "ajustes" && <SettingsPage user={props.user} />}
       </main>
 
       <nav className="tabs" aria-label="Seções">

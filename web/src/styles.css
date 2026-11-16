@@ -523,6 +523,47 @@ select {
   height: 24px;
 }
 
+/* Tela de login: a única antes da sessão. Sem barra de abas, centrada na largura. */
+.login {
+  justify-content: center;
+  min-height: 100dvh;
+  padding-bottom: calc(var(--e6) + env(safe-area-inset-bottom));
+}
+
+.login-logo {
+  width: 56px;
+  height: 56px;
+  border-radius: var(--canto-cartao);
+}
+
+.login-title {
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.login-lead {
+  font-size: 16px;
+}
+
+.google-button {
+  min-height: 44px;
+}
+
+/* Cartão "Sua conta" */
+.account {
+  display: flex;
+  align-items: center;
+  gap: var(--e3);
+}
+
+.account-photo {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+}
+
 /* 8. Movimento: com "reduzir movimento" ligado, nenhuma transição. */
 @media (prefers-reduced-motion: reduce) {
   .button,

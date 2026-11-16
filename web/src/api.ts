@@ -59,6 +59,23 @@ export type HistoryItem = {
   motivo: string | null;
 };
 
+export type User = {
+  id: string;
+  nome: string;
+  email: string;
+  foto: string | null;
+};
+
+export type LoginOptions = {
+  // O "ID do cliente OAuth" do Google; null quando o servidor não tem login com Google.
+  google: string | null;
+  // "Entrar como dev": só fora de produção.
+  dev: boolean;
+};
+
+// Disparado quando a API responde 401: a sessão acabou (ou a pessoa saiu), e o app volta para o login.
+export const SESSION_ENDED = "comedouro:sessao-encerrada";
+
 // Um erro da API: o `motivo` é o código que o servidor devolveu (ex.: "limite_diario").
 export class ApiError extends Error {
   constructor(
@@ -92,6 +109,9 @@ async function request<T>(
   }
 
   const data = await response.json().catch(() => null);
+  if (response.status === 401 && !path.startsWith("/sessao")) {
+    window.dispatchEvent(new Event(SESSION_ENDED));
+  }
   if (!response.ok) {
     throw new ApiError(
       response.status,
@@ -103,6 +123,13 @@ async function request<T>(
 }
 
 export const api = {
+  loginOptions: () => request<LoginOptions>("GET", "/sessao/opcoes"),
+  loginGoogle: (credencial: string) =>
+    request<{ usuario: User }>("POST", "/sessao", { credencial }),
+  loginDev: () => request<{ usuario: User }>("POST", "/sessao/dev"),
+  logout: () => request<null>("DELETE", "/sessao"),
+  me: () => request<User>("GET", "/eu"),
+
   status: () => request<Status>("GET", "/status"),
   feed: (porcoes: number, forcar = false) =>
     request<unknown>("POST", "/feed", { porcoes, forcar }),
