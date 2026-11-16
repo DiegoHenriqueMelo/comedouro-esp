@@ -68,6 +68,7 @@ export function SchedulePage() {
 
   const limit = config.data?.config.limiteDiarioPorcoes;
   const total = activePortions(items);
+  const full = items.length >= MAX_MEALS;
 
   return (
     <>
@@ -75,22 +76,20 @@ export function SchedulePage() {
         <h1>Agenda</h1>
       </header>
 
-      <p className="muted">
+      <p>
         As refeições se repetem todos os dias.
         {limit !== undefined &&
           ` As ativas somam ${total} de ${limit} porções do limite diário.`}
       </p>
 
       {items.length === 0 && (
-        <Card>
-          <p className="muted center">Nenhuma refeição agendada.</p>
-        </Card>
+        <p className="legend">Nenhuma refeição agendada.</p>
       )}
 
       {items.map((meal, index) => (
         // biome-ignore lint/suspicious/noArrayIndexKey: a lista é editada no lugar e não é reordenada
-        <Card key={index} className={meal.ativo ? "meal" : "meal meal-off"}>
-          <div className="meal-row">
+        <Card key={index} className={meal.ativo ? "" : "meal-off"}>
+          <div className="row">
             <input
               type="time"
               className="input input-time"
@@ -98,15 +97,20 @@ export function SchedulePage() {
               value={meal.hora}
               onChange={(e) => update(index, { hora: e.target.value })}
             />
-            <Stepper
-              value={meal.porcoes}
-              min={1}
-              max={10}
-              onChange={(porcoes) => update(index, { porcoes })}
-              label={`Porções da refeição ${index + 1}`}
-            />
+            <div className="row">
+              <Stepper
+                value={meal.porcoes}
+                min={1}
+                max={10}
+                onChange={(porcoes) => update(index, { porcoes })}
+                label={`Porções da refeição ${index + 1}`}
+              />
+              <span className="legend">
+                {meal.porcoes === 1 ? "porção" : "porções"}
+              </span>
+            </div>
           </div>
-          <div className="meal-row">
+          <div className="row">
             <label className="switch">
               <input
                 type="checkbox"
@@ -129,27 +133,23 @@ export function SchedulePage() {
       <button
         type="button"
         className="button"
-        disabled={items.length >= MAX_MEALS}
+        disabled={full}
         onClick={() =>
           change([...items, { hora: freeTime(items), porcoes: 1, ativo: true }])
         }
       >
-        {items.length >= MAX_MEALS
-          ? "Máximo de 8 refeições"
-          : "Adicionar refeição"}
+        {full ? "A agenda aceita até 8 refeições" : "Adicionar refeição"}
       </button>
 
-      <div className="save-bar">
-        <FeedbackLine feedback={action.feedback} />
-        <button
-          type="button"
-          className="button button-primary"
-          disabled={!dirty || action.busy}
-          onClick={() => void save()}
-        >
-          {action.busy ? "Salvando…" : "Salvar agenda"}
-        </button>
-      </div>
+      <FeedbackLine feedback={action.feedback} />
+      <button
+        type="button"
+        className="button button-primary"
+        disabled={!dirty || action.busy}
+        onClick={() => void save()}
+      >
+        {action.busy ? "Salvando…" : "Salvar agenda"}
+      </button>
     </>
   );
 }

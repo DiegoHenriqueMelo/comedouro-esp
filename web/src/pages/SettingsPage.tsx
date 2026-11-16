@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, type Config } from "../api";
 import { useAction, useLoad } from "../hooks";
-import { messageFor } from "../messages";
+import { fieldFor, messageFor } from "../messages";
 import { disablePush, enablePush, getPushState, type PushState } from "../push";
 import {
   Card,
@@ -12,7 +12,7 @@ import {
   parseNumber,
 } from "../ui";
 
-type NumericKey = Exclude<keyof Config, "fusoHorario">;
+type NumericKey = Exclude<keyof Config, "fusoHorario" | "nomeDoGato">;
 
 const FIELDS: { key: NumericKey; label: string; hint: string }[] = [
   {
@@ -22,52 +22,61 @@ const FIELDS: { key: NumericKey; label: string; hint: string }[] = [
   },
   {
     key: "limiteDiarioPorcoes",
-    label: "Limite diário (porções)",
-    hint: "O máximo que o alimentador serve num dia, somando agenda, app e Alexa.",
+    label: "Limite diário, em porções",
+    hint: "O máximo que o comedouro serve num dia, somando agenda, app e Alexa.",
   },
   {
     key: "intervaloMinimoMin",
-    label: "Intervalo mínimo (minutos)",
+    label: "Intervalo mínimo, em minutos",
     hint: "O tempo mínimo entre duas refeições.",
   },
   {
     key: "limiteTigelaGramas",
-    label: "Limite da tigela (gramas)",
-    hint: "Com mais que isso na tigela, o alimentador não serve.",
+    label: "Limite da tigela, em gramas",
+    hint: "Com mais que isso na tigela, o comedouro não serve.",
   },
   {
     key: "alturaGarrafaMm",
-    label: "Altura da garrafa (mm)",
+    label: "Altura da garrafa, em milímetros",
     hint: "Da tampa até o fundo, para calcular o nível.",
   },
   {
     key: "anguloEncher",
-    label: "Ângulo de encher (graus)",
+    label: "Ângulo de encher, em graus",
     hint: "A posição do servo com o bolso embaixo da garrafa.",
   },
   {
     key: "anguloServir",
-    label: "Ângulo de servir (graus)",
+    label: "Ângulo de servir, em graus",
     hint: "A posição do servo com o bolso em cima do furo de saída.",
   },
 ];
 
-type Form = Record<NumericKey, string> & { fusoHorario: string };
+type Form = Record<NumericKey, string> & {
+  fusoHorario: string;
+  nomeDoGato: string;
+};
 
 function toForm(config: Config): Form {
-  const form = { fusoHorario: config.fusoHorario } as Form;
+  const form = {
+    fusoHorario: config.fusoHorario,
+    nomeDoGato: config.nomeDoGato,
+  } as Form;
   for (const { key } of FIELDS) {
     form[key] = String(config[key]).replace(".", ",");
   }
   return form;
 }
 
-// Devolve null quando algum campo não é número.
-export function fromForm(form: Form): Config | null {
-  const config = { fusoHorario: form.fusoHorario } as Config;
+// Devolve o nome do primeiro campo que não é número, ou a configuração pronta.
+export function fromForm(form: Form): Config | { invalid: NumericKey } {
+  const config = {
+    fusoHorario: form.fusoHorario,
+    nomeDoGato: form.nomeDoGato.trim(),
+  } as Config;
   for (const { key } of FIELDS) {
     const value = parseNumber(form[key]);
-    if (Number.isNaN(value)) return null;
+    if (Number.isNaN(value)) return { invalid: key };
     config[key] = value;
   }
   return config;
@@ -78,6 +87,11 @@ export function SettingsPage() {
   const status = useLoad(api.status, 5000);
   const [form, setForm] = useState<Form | null>(null);
   const [dirty, setDirty] = useState(false);
+  // O erro fica embaixo do campo que o causou (guia de UI/UX, seção 5.7).
+  const [fieldError, setFieldError] = useState<{
+    key: string;
+    text: string;
+  } | null>(null);
   const action = useAction();
 
   useEffect(() => {
@@ -97,27 +111,57 @@ export function SettingsPage() {
   const set = (key: keyof Form, value: string) => {
     setForm({ ...form, [key]: value });
     setDirty(true);
+    setFieldError(null);
     action.setFeedback(null);
   };
+  const errorOf = (key: string) =>
+    fieldError?.key === key ? fieldError.text : null;
 
   const save = async () => {
+    setFieldError(null);
     const config = fromForm(form);
-    if (!config) {
-      action.setFeedback({
-        tone: "bad",
-        text: "Há um campo que não é número. Confira os valores.",
-      });
+    if ("invalid" in config) {
+      setFieldError({ key: config.invalid, text: "Digite um número." });
       return;
     }
-    const ok = await action.run(() => api.saveConfig(config), {
-      ok: "Ajustes salvos.",
-      error: (err) => messageFor(err),
-    });
+
+    let failure: unknown = null;
+    const ok = await action.run(
+      async () => {
+        try {
+          await api.saveConfig(config);
+        } catch (err) {
+          failure = err;
+          throw err;
+        }
+      },
+      { ok: "Ajustes salvos.", error: (err) => messageFor(err) },
+    );
+
     if (ok) {
       setDirty(false);
       await saved.reload();
+      return;
+    }
+    const key = fieldFor(failure);
+    if (key) {
+      // O erro tem dono: sai do rodapé e vai para o campo.
+      setFieldError({ key, text: messageFor(failure) });
+      action.setFeedback(null);
     }
   };
+
+  const numberField = (f: (typeof FIELDS)[number]) => (
+    <Field key={f.key} label={f.label} hint={f.hint} error={errorOf(f.key)}>
+      <input
+        className="input"
+        inputMode="decimal"
+        aria-invalid={errorOf(f.key) !== null}
+        value={form[f.key]}
+        onChange={(e) => set(f.key, e.target.value)}
+      />
+    </Field>
+  );
 
   return (
     <>
@@ -125,18 +169,30 @@ export function SettingsPage() {
         <h1>Ajustes</h1>
       </header>
 
+      <Card title="Seu gato">
+        <Field
+          label="Nome"
+          hint="O app usa o nome nas frases: “Mingau comeu às 12:30.”"
+          error={errorOf("nomeDoGato")}
+        >
+          <input
+            className="input"
+            autoComplete="off"
+            maxLength={30}
+            aria-invalid={errorOf("nomeDoGato") !== null}
+            value={form.nomeDoGato}
+            onChange={(e) => set("nomeDoGato", e.target.value)}
+          />
+        </Field>
+      </Card>
+
       <Card title="Alimentação">
-        {FIELDS.slice(0, 4).map((f) => (
-          <Field key={f.key} label={f.label} hint={f.hint}>
-            <input
-              className="input"
-              inputMode="decimal"
-              value={form[f.key]}
-              onChange={(e) => set(f.key, e.target.value)}
-            />
-          </Field>
-        ))}
-        <Field label="Fuso horário" hint="O horário da agenda segue este fuso.">
+        {FIELDS.slice(0, 4).map(numberField)}
+        <Field
+          label="Fuso horário"
+          hint="O horário da agenda segue este fuso."
+          error={errorOf("fusoHorario")}
+        >
           <select
             className="input"
             value={form.fusoHorario}
@@ -151,41 +207,28 @@ export function SettingsPage() {
         </Field>
       </Card>
 
-      <Card title="Mecânica">
-        {FIELDS.slice(4).map((f) => (
-          <Field key={f.key} label={f.label} hint={f.hint}>
-            <input
-              className="input"
-              inputMode="decimal"
-              value={form[f.key]}
-              onChange={(e) => set(f.key, e.target.value)}
-            />
-          </Field>
-        ))}
-      </Card>
+      <Card title="Mecânica">{FIELDS.slice(4).map(numberField)}</Card>
 
-      <div className="save-bar">
-        <FeedbackLine feedback={action.feedback} />
-        <button
-          type="button"
-          className="button button-primary"
-          disabled={!dirty || action.busy}
-          onClick={() => void save()}
-        >
-          {action.busy ? "Salvando…" : "Salvar ajustes"}
-        </button>
-      </div>
+      <FeedbackLine feedback={action.feedback} />
+      <button
+        type="button"
+        className="button button-primary"
+        disabled={!dirty || action.busy}
+        onClick={() => void save()}
+      >
+        {action.busy ? "Salvando…" : "Salvar ajustes"}
+      </button>
 
       <Maintenance form={form} />
       <Notifications />
       {status.data?.simulado && <Simulator onDone={status.reload} />}
 
-      <p className="muted center small">
+      <p className="legend center">
         Configuração na versão {saved.data.versao}
         {status.data &&
           (status.data.config.sincronizado
-            ? ", sincronizada com o alimentador."
-            : ", ainda não aplicada pelo alimentador.")}
+            ? ", sincronizada com o comedouro."
+            : ", ainda não aplicada pelo comedouro.")}
       </p>
     </>
   );
@@ -203,7 +246,7 @@ function Maintenance(props: { form: Form }) {
   const number = (text: string, send: (value: number) => Promise<unknown>) => {
     const value = parseNumber(text);
     if (Number.isNaN(value)) {
-      action.setFeedback({ tone: "bad", text: "Digite um número." });
+      action.setFeedback({ tone: "warn", text: "Digite um número." });
       return;
     }
     run(() => send(value), "Comando enviado.");
@@ -211,10 +254,10 @@ function Maintenance(props: { form: Form }) {
 
   return (
     <Card title="Manutenção">
-      <div className="maintenance">
-        <p className="muted">
-          <strong>Balança.</strong> Tare com a tigela vazia e limpa. Para
-          calibrar, coloque um peso conhecido no prato.
+      <div className="section stack">
+        <p className="legend">
+          Balança: tare com a tigela vazia e limpa. Para calibrar, coloque um
+          peso conhecido no prato.
         </p>
         <button
           type="button"
@@ -224,50 +267,52 @@ function Maintenance(props: { form: Form }) {
         >
           Tarar a balança
         </button>
-        <div className="inline">
+        <Field label="Peso conhecido, em gramas">
           <input
             className="input"
             inputMode="decimal"
-            aria-label="Peso conhecido, em gramas"
             value={peso}
             onChange={(e) => setPeso(e.target.value)}
           />
-          <button
-            type="button"
-            className="button"
-            disabled={action.busy}
-            onClick={() => number(peso, api.calibrateScale)}
-          >
-            Calibrar com esse peso (g)
-          </button>
-        </div>
+        </Field>
+        <button
+          type="button"
+          className="button"
+          disabled={action.busy}
+          onClick={() => number(peso, api.calibrateScale)}
+        >
+          Calibrar a balança
+        </button>
+      </div>
 
-        <p className="muted">
-          <strong>Dose.</strong> Solte várias porções numa balança de cozinha e
-          divida o peso pelo número de porções: o resultado é o “gramas por
-          porção”. Essas porções não contam no limite diário.
+      <div className="section stack">
+        <p className="legend">
+          Dose: solte várias porções numa balança de cozinha e divida o peso
+          pelo número de porções. O resultado é o “gramas por porção”. Essas
+          porções não contam no limite diário.
         </p>
-        <div className="inline">
+        <Field label="Quantidade de porções">
           <input
             className="input"
             inputMode="numeric"
-            aria-label="Quantidade de porções para pesar"
             value={porcoes}
             onChange={(e) => setPorcoes(e.target.value)}
           />
-          <button
-            type="button"
-            className="button"
-            disabled={action.busy}
-            onClick={() => number(porcoes, api.calibrateDose)}
-          >
-            Soltar porções para pesar
-          </button>
-        </div>
+        </Field>
+        <button
+          type="button"
+          className="button"
+          disabled={action.busy}
+          onClick={() => number(porcoes, api.calibrateDose)}
+        >
+          Soltar porções para pesar
+        </button>
+      </div>
 
-        <p className="muted">
-          <strong>Servo.</strong> Move o servo até o ângulo digitado nos campos
-          acima, para achar as posições certas antes de salvar.
+      <div className="section stack">
+        <p className="legend">
+          Servo: move o servo até o ângulo digitado nos campos acima, para achar
+          as posições certas antes de salvar.
         </p>
         <div className="inline">
           <button
@@ -287,8 +332,8 @@ function Maintenance(props: { form: Form }) {
             Testar ângulo de servir
           </button>
         </div>
-        <FeedbackLine feedback={action.feedback} />
       </div>
+      <FeedbackLine feedback={action.feedback} />
     </Card>
   );
 }
@@ -297,11 +342,11 @@ const PUSH_TEXT: Record<PushState, string> = {
   sem_suporte:
     "Este navegador não recebe notificações. No iPhone, instale o app na tela inicial antes. O endereço também precisa ser HTTPS.",
   servidor_desligado:
-    "O servidor está sem as chaves de notificação (VAPID). Veja o guia de configuração.",
+    "O servidor está sem as chaves de notificação. Veja o guia de configuração.",
   bloqueado:
     "As notificações estão bloqueadas para este site. Libere nas configurações do navegador.",
   desativado: "As notificações estão desativadas neste aparelho.",
-  ativado: "Este aparelho recebe os avisos do alimentador.",
+  ativado: "Este aparelho recebe os avisos do comedouro.",
 };
 
 function Notifications() {
@@ -322,44 +367,42 @@ function Notifications() {
 
   return (
     <Card title="Notificações">
-      <p className="muted">{state ? PUSH_TEXT[state] : "Verificando…"}</p>
-      <div className="inline">
-        {state === "desativado" && (
+      <p className="legend">{state ? PUSH_TEXT[state] : "Verificando…"}</p>
+      {state === "desativado" && (
+        <button
+          type="button"
+          className="button"
+          disabled={action.busy}
+          onClick={() => change(enablePush, "Notificações ativadas.")}
+        >
+          Ativar neste aparelho
+        </button>
+      )}
+      {state === "ativado" && (
+        <div className="inline">
           <button
             type="button"
-            className="button button-primary"
+            className="button"
             disabled={action.busy}
-            onClick={() => change(enablePush, "Pronto.")}
+            onClick={() =>
+              void action.run(api.pushTest, {
+                ok: "Teste enviado: a notificação chega em instantes.",
+                error: (err) => messageFor(err),
+              })
+            }
           >
-            Ativar neste aparelho
+            Enviar um teste
           </button>
-        )}
-        {state === "ativado" && (
-          <>
-            <button
-              type="button"
-              className="button"
-              disabled={action.busy}
-              onClick={() =>
-                void action.run(api.pushTest, {
-                  ok: "Teste enviado: a notificação chega em instantes.",
-                  error: (err) => messageFor(err),
-                })
-              }
-            >
-              Enviar um teste
-            </button>
-            <button
-              type="button"
-              className="button button-quiet"
-              disabled={action.busy}
-              onClick={() => change(disablePush, "Notificações desativadas.")}
-            >
-              Desativar
-            </button>
-          </>
-        )}
-      </div>
+          <button
+            type="button"
+            className="button button-quiet"
+            disabled={action.busy}
+            onClick={() => change(disablePush, "Notificações desativadas.")}
+          >
+            Desativar
+          </button>
+        </div>
+      )}
       <FeedbackLine feedback={action.feedback} />
     </Card>
   );
@@ -382,7 +425,7 @@ function Simulator(props: { onDone: () => Promise<void> }) {
   const grams = (text: string, key: "tigelaGramas" | "garrafaGramas") => {
     const value = parseNumber(text);
     if (Number.isNaN(value)) {
-      action.setFeedback({ tone: "bad", text: "Digite um número." });
+      action.setFeedback({ tone: "warn", text: "Digite um número." });
       return;
     }
     send({ [key]: value });
@@ -390,45 +433,47 @@ function Simulator(props: { onDone: () => Promise<void> }) {
 
   return (
     <Card title="Simulador">
-      <p className="muted">
-        O servidor está rodando sem ESP32. Use isto para ver as recusas e os
+      <p className="legend">
+        O servidor está rodando sem a placa. Use isto para ver as recusas e os
         avisos acontecerem.
       </p>
-      <div className="inline">
-        <input
-          className="input"
-          inputMode="decimal"
-          aria-label="Gramas na tigela"
-          value={tigela}
-          onChange={(e) => setTigela(e.target.value)}
-        />
+      <div className="section stack">
+        <Field label="Ração na tigela, em gramas">
+          <input
+            className="input"
+            inputMode="decimal"
+            value={tigela}
+            onChange={(e) => setTigela(e.target.value)}
+          />
+        </Field>
         <button
           type="button"
           className="button"
           disabled={action.busy}
           onClick={() => grams(tigela, "tigelaGramas")}
         >
-          Pôr ração na tigela (g)
+          Aplicar na tigela
         </button>
       </div>
-      <div className="inline">
-        <input
-          className="input"
-          inputMode="decimal"
-          aria-label="Gramas na garrafa"
-          value={garrafa}
-          onChange={(e) => setGarrafa(e.target.value)}
-        />
+      <div className="section stack">
+        <Field label="Ração na garrafa, em gramas">
+          <input
+            className="input"
+            inputMode="decimal"
+            value={garrafa}
+            onChange={(e) => setGarrafa(e.target.value)}
+          />
+        </Field>
         <button
           type="button"
           className="button"
           disabled={action.busy}
           onClick={() => grams(garrafa, "garrafaGramas")}
         >
-          Deixar na garrafa (g)
+          Aplicar na garrafa
         </button>
       </div>
-      <div className="inline">
+      <div className="section inline">
         <button
           type="button"
           className="button"

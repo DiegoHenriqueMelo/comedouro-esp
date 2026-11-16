@@ -11,12 +11,14 @@ export type Config = {
   alturaGarrafaMm: number;
   anguloEncher: number;
   anguloServir: number;
+  nomeDoGato: string;
 };
 
 export type Alert = { tipo: string; mensagem: string; desde: string };
 
 export type Status = {
   hora: string;
+  nomeDoGato: string;
   online: boolean;
   onlineDesde: string | null;
   estado: "ocioso" | "servindo" | "vazio" | null;

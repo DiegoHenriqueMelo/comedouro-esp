@@ -12,7 +12,9 @@ export default defineConfig({
       srcDir: "src",
       filename: "sw.ts",
       registerType: "autoUpdate",
-      injectManifest: { globPatterns: ["**/*.{js,css,html,svg,png,ico}"] },
+      injectManifest: {
+        globPatterns: ["**/*.{js,css,html,svg,png,ico,woff2}"],
+      },
       manifest: {
         name: "Comedouro",
         short_name: "Comedouro",
@@ -20,8 +22,8 @@ export default defineConfig({
         lang: "pt-BR",
         start_url: "/",
         display: "standalone",
-        background_color: "#f6f3ee",
-        theme_color: "#1f6f5c",
+        background_color: "#faf7f4",
+        theme_color: "#faf7f4",
         icons: [
           { src: "pwa-64x64.png", sizes: "64x64", type: "image/png" },
           { src: "pwa-192x192.png", sizes: "192x192", type: "image/png" },

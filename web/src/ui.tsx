@@ -1,8 +1,9 @@
 import type { ReactNode } from "react";
-import type { Feedback } from "./hooks";
+import type { Feedback, Tone } from "./hooks";
 
-// Peças pequenas de interface, usadas em todas as telas.
+// As peças de interface do guia de UI/UX (docs/UI-UX.md, seção 5). Toda tela é montada com elas.
 
+// 5.2 Cartão: um assunto por cartão, com o título em frase normal.
 export function Card(props: {
   title?: string;
   children: ReactNode;
@@ -16,14 +17,41 @@ export function Card(props: {
   );
 }
 
-export function Chip(props: {
-  tone: "ok" | "warn" | "bad" | "muted";
-  children: ReactNode;
-}) {
-  return <span className={`chip chip-${props.tone}`}>{props.children}</span>;
+// 5.4 Linha de estado: um ponto e o estado escrito. A cor nunca vai sozinha.
+export function StateLine(props: { tone: Tone; children: ReactNode }) {
+  return (
+    <span className={`state state-${props.tone}`}>
+      <span className="state-dot" aria-hidden="true" />
+      {props.children}
+    </span>
+  );
 }
 
-// Uma barra de progresso de 0 a 100%.
+// 5.5 Aviso: o bloco inteiro com o fundo suave do estado, para o que pede atenção agora.
+export function Notice(props: {
+  tone: Tone;
+  title?: string;
+  children?: ReactNode;
+  action?: ReactNode;
+}) {
+  return (
+    <div
+      className={`notice notice-${props.tone}`}
+      role={props.tone === "ok" ? "status" : "alert"}
+    >
+      {props.title && <strong>{props.title}</strong>}
+      {props.children && <span>{props.children}</span>}
+      {props.action}
+    </div>
+  );
+}
+
+export function FeedbackLine(props: { feedback: Feedback }) {
+  if (!props.feedback) return null;
+  return <Notice tone={props.feedback.tone}>{props.feedback.text}</Notice>;
+}
+
+// 5.9 A barra de um indicador. Ela não muda de cor: quem avisa é a linha de estado.
 export function Meter(props: { value: number; max: number; label: string }) {
   const percent =
     props.max > 0
@@ -40,18 +68,6 @@ export function Meter(props: { value: number; max: number; label: string }) {
     >
       <div className="meter-fill" style={{ width: `${percent}%` }} />
     </div>
-  );
-}
-
-export function FeedbackLine(props: { feedback: Feedback }) {
-  if (!props.feedback) return null;
-  return (
-    <p
-      className={`feedback feedback-${props.feedback.tone}`}
-      role={props.feedback.tone === "bad" ? "alert" : "status"}
-    >
-      {props.feedback.text}
-    </p>
   );
 }
 
@@ -90,9 +106,11 @@ export function Stepper(props: {
   );
 }
 
+// 5.7 Campo: rótulo em cima, legenda embaixo, e o erro embaixo do campo que causou.
 export function Field(props: {
   label: string;
   hint?: string;
+  error?: string | null;
   children: ReactNode;
 }) {
   return (
@@ -100,23 +118,35 @@ export function Field(props: {
     <label className="field">
       <span className="field-label">{props.label}</span>
       {props.children}
-      {props.hint && <span className="field-hint">{props.hint}</span>}
+      {props.error ? (
+        <span className="field-error" role="alert">
+          {props.error}
+        </span>
+      ) : (
+        props.hint && <span className="field-hint">{props.hint}</span>
+      )}
     </label>
   );
 }
 
+// 5.12 Carregando: só o texto, sem girador.
 export function Loading() {
-  return <p className="muted center">Carregando…</p>;
+  return <p className="legend center">Carregando…</p>;
 }
 
+// 5.12 Erro: um aviso de problema com "Tentar de novo".
 export function LoadError(props: { message: string; onRetry: () => void }) {
   return (
-    <div className="card center">
-      <p role="alert">{props.message}</p>
-      <button type="button" className="button" onClick={props.onRetry}>
-        Tentar de novo
-      </button>
-    </div>
+    <Notice
+      tone="bad"
+      action={
+        <button type="button" className="button" onClick={props.onRetry}>
+          Tentar de novo
+        </button>
+      }
+    >
+      {props.message}
+    </Notice>
   );
 }
 
@@ -124,4 +154,42 @@ export function LoadError(props: { message: string; onRetry: () => void }) {
 export function parseNumber(text: string): number {
   const trimmed = text.trim().replace(",", ".");
   return trimmed === "" ? Number.NaN : Number(trimmed);
+}
+
+// 5.8 Ícones: de linha, com traço de 1,5, na cor do texto ao redor.
+const ICONS = {
+  inicio: <path d="M4 11.2 12 4l8 7.2V20h-5.2v-5.6H9.2V20H4z" />,
+  agenda: (
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 7.5V12l3 2" />
+    </>
+  ),
+  historico: <path d="M5 7h14M5 12h14M5 17h9" />,
+  ajustes: (
+    <>
+      <path d="M4 8h8.5M17.5 8H20M4 16h2.5M11.5 16H20" />
+      <circle cx="15" cy="8" r="2.5" />
+      <circle cx="9" cy="16" r="2.5" />
+    </>
+  ),
+} as const;
+
+export type IconName = keyof typeof ICONS;
+
+export function Icon(props: { name: IconName }) {
+  return (
+    <svg
+      className="icon"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {ICONS[props.name]}
+    </svg>
+  );
 }

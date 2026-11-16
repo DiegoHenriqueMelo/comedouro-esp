@@ -40,27 +40,28 @@ export function HistoryPage() {
         <h1>Histórico</h1>
       </header>
 
-      {groups.length === 0 && (
-        <Card>
-          <p className="muted center">Nada registrado ainda.</p>
-        </Card>
-      )}
+      {groups.length === 0 && <p className="legend">Nada registrado ainda.</p>}
 
       {groups.map((group) => (
         <Card key={group.day} title={group.day}>
-          <ul className="history">
+          <ul className="list">
             {group.items.map((item) => {
               const line = historyLine(item);
               return (
-                <li key={item.seq} className="history-item">
-                  <span className={`dot dot-${line.tone}`} aria-hidden="true" />
-                  <span className="history-text">
-                    <strong>{line.title}</strong>
+                <li key={item.seq} className="list-item">
+                  <span
+                    className={`state state-${line.tone}`}
+                    aria-hidden="true"
+                  >
+                    <span className="state-dot" />
+                  </span>
+                  <span className="list-text">
+                    <span>{line.title}</span>
                     {line.detail && (
-                      <span className="muted">{line.detail}</span>
+                      <span className="legend">{line.detail}</span>
                     )}
                   </span>
-                  <time className="muted" dateTime={item.hora}>
+                  <time className="legend list-time" dateTime={item.hora}>
                     {formatTime(item.hora)}
                   </time>
                 </li>

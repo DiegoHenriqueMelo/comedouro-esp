@@ -3,23 +3,25 @@ import { api, type Status } from "../api";
 import { useAction, useLoad } from "../hooks";
 import {
   alertTitle,
+  alertTone,
   canForce,
   formatGrams,
-  formatTime,
   messageFor,
   needsAcknowledge,
-  originLabel,
+  situation,
 } from "../messages";
 import {
   Card,
-  Chip,
   FeedbackLine,
   LoadError,
   Loading,
   Meter,
+  Notice,
+  StateLine,
   Stepper,
 } from "../ui";
 
+// A tela inicial segue a hierarquia do guia: "está tudo bem?", depois a ação, depois os números.
 export function HomePage() {
   const status = useLoad(api.status, 3000);
 
@@ -38,120 +40,42 @@ export function HomePage() {
     <>
       <header className="page-header">
         <h1>Comedouro</h1>
-        <div className="chips">
-          {s.simulado && <Chip tone="muted">Simulado</Chip>}
-          <Chip tone={s.online ? "ok" : "bad"}>
+        <div className="header-state">
+          {s.simulado && <span className="legend">Simulado</span>}
+          <StateLine tone={s.online ? "ok" : "bad"}>
             {s.online ? "Online" : "Offline"}
-          </Chip>
+          </StateLine>
         </div>
       </header>
 
+      <p className="situation">{situation(s)}</p>
+
       {status.error !== null && (
-        <p className="feedback feedback-bad" role="alert">
+        <Notice tone="bad">
           {messageFor(status.error)} Mostrando os últimos dados recebidos.
-        </p>
+        </Notice>
       )}
 
       <Alerts status={s} onDone={status.reload} />
       <ServeCard status={s} onDone={status.reload} />
+      <Indicators status={s} />
 
-      <div className="grid">
-        <Card title="Hoje">
-          <p className="big">
-            {s.hoje.porcoes}
-            <span className="big-unit">
-              {" "}
-              de {s.limites.limiteDiarioPorcoes} porções
-            </span>
-          </p>
-          <Meter
-            value={s.hoje.porcoes}
-            max={s.limites.limiteDiarioPorcoes}
-            label="Porções de hoje"
-          />
-          <p className="muted">{formatGrams(s.hoje.gramas)} servidos</p>
-        </Card>
-
-        <Card title="Garrafa">
-          {s.garrafa?.percentual === null ||
-          s.garrafa?.percentual === undefined ? (
-            <p className="muted">Sem leitura</p>
-          ) : (
-            <>
-              <p className="big">
-                {Math.round(s.garrafa.percentual)}
-                <span className="big-unit">%</span>
-              </p>
-              <Meter
-                value={s.garrafa.percentual}
-                max={100}
-                label="Nível da garrafa"
-              />
-              <p className="muted">
-                {s.garrafa.diasRestantes === null
-                  ? "Sem agenda para estimar"
-                  : `Dá para cerca de ${s.garrafa.diasRestantes} ${s.garrafa.diasRestantes === 1 ? "dia" : "dias"}`}
-              </p>
-            </>
-          )}
-        </Card>
-
-        <Card title="Tigela">
-          {s.tigela?.gramas === null || s.tigela?.gramas === undefined ? (
-            <p className="muted">Sem leitura</p>
-          ) : (
-            <>
-              <p className="big">{formatGrams(s.tigela.gramas)}</p>
-              <p className="muted">
-                {s.tigela.gramas > s.limites.limiteTigelaGramas
-                  ? "Ainda tem ração"
-                  : "Vazia"}
-              </p>
-            </>
-          )}
-        </Card>
-
-        <Card title="Próxima refeição">
-          {s.proximaRefeicao ? (
-            <>
-              <p className="big">{s.proximaRefeicao.hora}</p>
-              <p className="muted">
-                {s.proximaRefeicao.porcoes}{" "}
-                {s.proximaRefeicao.porcoes === 1 ? "porção" : "porções"}
-                {s.proximaRefeicao.amanha ? ", amanhã" : ""}
-              </p>
-            </>
-          ) : (
-            <p className="muted">Nenhuma refeição ativa na agenda</p>
-          )}
-        </Card>
-      </div>
-
-      <Card title="Última refeição">
-        {s.ultimaRefeicao ? (
-          <p>
-            {formatTime(s.ultimaRefeicao.hora)}
-            {s.ultimaRefeicao.porcoes !== null &&
-              ` · ${s.ultimaRefeicao.porcoes} ${s.ultimaRefeicao.porcoes === 1 ? "porção" : "porções"}`}
-            {s.ultimaRefeicao.gramas !== null &&
-              ` · ${formatGrams(s.ultimaRefeicao.gramas)}`}
-            {s.ultimaRefeicao.origem &&
-              ` · ${originLabel(s.ultimaRefeicao.origem)}`}
-          </p>
-        ) : (
-          <p className="muted">Nenhuma refeição registrada ainda</p>
-        )}
-      </Card>
-
-      <p className="muted center small">
-        {s.config.sincronizado
-          ? "Configuração sincronizada com o alimentador"
-          : "Configuração pendente: o alimentador aplica quando estiver online"}
-      </p>
+      {s.config.sincronizado ? (
+        <p className="legend center">
+          Configuração sincronizada com o comedouro
+        </p>
+      ) : (
+        <p className="center">
+          <StateLine tone="warn">
+            Configuração pendente: o comedouro aplica quando estiver online
+          </StateLine>
+        </p>
+      )}
     </>
   );
 }
 
+// O bloco principal da tela: servir agora.
 export function ServeCard(props: {
   status: Status;
   onDone: () => Promise<void>;
@@ -181,8 +105,8 @@ export function ServeCard(props: {
   };
 
   return (
-    <Card className="serve">
-      <div className="serve-row">
+    <section className="main-block" aria-label="Servir">
+      <div className="main-block-row">
         <Stepper
           value={porcoes}
           min={1}
@@ -191,11 +115,11 @@ export function ServeCard(props: {
           label="Quantidade de porções"
           disabled={action.busy}
         />
-        <span className="muted">{porcoes === 1 ? "porção" : "porções"}</span>
+        <span>{porcoes === 1 ? "porção" : "porções"}</span>
       </div>
       <button
         type="button"
-        className="button button-primary button-big"
+        className="button button-primary button-tall"
         disabled={action.busy || serving}
         onClick={() => void serve(false)}
       >
@@ -212,7 +136,7 @@ export function ServeCard(props: {
           Servir mesmo assim
         </button>
       )}
-    </Card>
+    </section>
   );
 }
 
@@ -229,27 +153,106 @@ function Alerts(props: { status: Status; onDone: () => Promise<void> }) {
     await props.onDone();
   };
 
+  // Do mais grave para o menos grave.
+  const ordered = [...alertas].sort(
+    (a, b) =>
+      Number(alertTone(a.tipo) === "warn") -
+      Number(alertTone(b.tipo) === "warn"),
+  );
+
   return (
-    <section className="alerts" aria-label="Alertas">
-      {alertas.map((alerta) => (
-        <div className="alert" key={alerta.tipo} role="alert">
-          <strong>{alertTitle(alerta.tipo)}</strong>
-          <span>{alerta.mensagem}</span>
-        </div>
-      ))}
-      {alertas.some((a) => needsAcknowledge(a.tipo)) && (
-        <button
-          type="button"
-          className="button"
-          disabled={action.busy}
-          onClick={() => void acknowledge()}
+    <section className="notices" aria-label="Alertas">
+      {ordered.map((alerta) => (
+        <Notice
+          key={alerta.tipo}
+          tone={alertTone(alerta.tipo)}
+          title={alertTitle(alerta.tipo)}
+          action={
+            needsAcknowledge(alerta.tipo) && (
+              <button
+                type="button"
+                className="button"
+                disabled={action.busy}
+                onClick={() => void acknowledge()}
+              >
+                Entendi
+              </button>
+            )
+          }
         >
-          Entendi
-        </button>
-      )}
+          {alerta.mensagem}
+        </Notice>
+      ))}
       {action.feedback?.tone === "bad" && (
         <FeedbackLine feedback={action.feedback} />
       )}
     </section>
+  );
+}
+
+function Indicators(props: { status: Status }) {
+  const s = props.status;
+  const percent = s.garrafa?.percentual ?? null;
+  const days = s.garrafa?.diasRestantes ?? null;
+  const bowl = s.tigela?.gramas ?? null;
+
+  return (
+    <>
+      <Card title="Hoje">
+        <p className="number">
+          {s.hoje.porcoes}
+          <span className="number-unit">
+            {" "}
+            de {s.limites.limiteDiarioPorcoes} porções
+          </span>
+        </p>
+        <Meter
+          value={s.hoje.porcoes}
+          max={s.limites.limiteDiarioPorcoes}
+          label="Porções de hoje"
+        />
+        <p className="legend">{formatGrams(s.hoje.gramas)} servidos</p>
+      </Card>
+
+      <div className="grid">
+        <Card title="Garrafa">
+          {percent === null ? (
+            <StateLine tone="bad">Sem leitura</StateLine>
+          ) : (
+            <>
+              <p className="number">
+                {Math.round(percent)}
+                <span className="number-unit"> %</span>
+              </p>
+              <Meter value={percent} max={100} label="Nível da garrafa" />
+              {percent < 20 ? (
+                <StateLine tone="warn">Ração acabando</StateLine>
+              ) : (
+                <p className="legend">
+                  {days === null
+                    ? "Sem agenda para estimar"
+                    : `Dá para ${days} ${days === 1 ? "dia" : "dias"}`}
+                </p>
+              )}
+            </>
+          )}
+        </Card>
+
+        <Card title="Tigela">
+          {bowl === null ? (
+            <StateLine tone="bad">Sem leitura</StateLine>
+          ) : (
+            <>
+              <p className="number">{formatGrams(bowl)}</p>
+              <p className="legend">
+                {bowl > s.limites.limiteTigelaGramas
+                  ? "Ainda tem ração"
+                  : "Vazia"}
+              </p>
+            </>
+          )}
+        </Card>
+      </div>
+    </>
   );
 }

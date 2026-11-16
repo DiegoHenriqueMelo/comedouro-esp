@@ -1,4 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { type Tone, toneFor } from "./messages";
+
+export type { Tone };
 
 export type Loadable<T> = {
   data: T | null;
@@ -50,7 +53,7 @@ export function useLoad<T>(
   return { data, error, loading, reload };
 }
 
-export type Feedback = { tone: "ok" | "bad"; text: string } | null;
+export type Feedback = { tone: Tone; text: string } | null;
 
 // Uma ação com botão: enquanto roda, o botão fica desabilitado; o resultado vira uma mensagem.
 export function useAction() {
@@ -69,7 +72,8 @@ export function useAction() {
         setFeedback({ tone: "ok", text: messages.ok });
         return true;
       } catch (err) {
-        setFeedback({ tone: "bad", text: messages.error(err) });
+        // Uma recusa é aviso; uma falha é problema.
+        setFeedback({ tone: toneFor(err), text: messages.error(err) });
         return false;
       } finally {
         setBusy(false);

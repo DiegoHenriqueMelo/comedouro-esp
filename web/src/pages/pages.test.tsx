@@ -176,7 +176,7 @@ describe("funções de apoio das telas", () => {
     ]);
   });
 
-  it("fromForm aceita vírgula e devolve null quando um campo não é número", () => {
+  it("fromForm aceita vírgula, tira os espaços do nome e aponta o campo que não é número", () => {
     const form = {
       gramasPorPorcao: "6,5",
       limiteDiarioPorcoes: "10",
@@ -186,10 +186,18 @@ describe("funções de apoio das telas", () => {
       anguloEncher: "0",
       anguloServir: "60",
       fusoHorario: "America/Sao_Paulo",
+      nomeDoGato: " Mingau ",
     };
 
-    expect(fromForm(form)?.gramasPorPorcao).toBe(6.5);
-    expect(fromForm({ ...form, anguloServir: "abc" })).toBeNull();
-    expect(fromForm({ ...form, limiteDiarioPorcoes: "" })).toBeNull();
+    expect(fromForm(form)).toMatchObject({
+      gramasPorPorcao: 6.5,
+      nomeDoGato: "Mingau",
+    });
+    expect(fromForm({ ...form, anguloServir: "abc" })).toEqual({
+      invalid: "anguloServir",
+    });
+    expect(fromForm({ ...form, limiteDiarioPorcoes: "" })).toEqual({
+      invalid: "limiteDiarioPorcoes",
+    });
   });
 });

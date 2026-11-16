@@ -15,7 +15,7 @@ const status = (changes: Partial<Status>) => changes as Status;
 describe("messageFor: cada motivo vira uma frase clara", () => {
   it.each([
     ["limite_diario", "Limite de hoje atingido."],
-    ["alimentador_offline", "O alimentador está offline."],
+    ["alimentador_offline", "O comedouro está offline."],
     ["agenda_cheia", "A agenda aceita no máximo 8 refeições."],
     ["sem_conexao", "Sem conexão com o servidor."],
   ])("%s", (motivo, frase) => {

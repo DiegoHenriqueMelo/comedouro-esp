@@ -7,8 +7,8 @@ const MOTIVOS: Record<string, string> = {
   limite_diario: "Limite de hoje atingido.",
   intervalo: "Ainda não deu o intervalo mínimo desde a última refeição.",
   tigela_com_racao: "A tigela ainda tem ração.",
-  ocupado: "O alimentador está ocupado. Tente de novo em instantes.",
-  alimentador_offline: "O alimentador está offline.",
+  ocupado: "O comedouro está ocupado. Tente de novo em instantes.",
+  alimentador_offline: "O comedouro está offline.",
   // regras da agenda e da configuração
   agenda_cheia: "A agenda aceita no máximo 8 refeições.",
   horario_repetido: "Há duas refeições no mesmo horário.",
@@ -23,6 +23,7 @@ const MOTIVOS: Record<string, string> = {
   limite_tigela_invalido: "Limite da tigela: de 0 a 100 g.",
   fuso_invalido: "Fuso horário desconhecido.",
   altura_garrafa_invalida: "Altura da garrafa: de 50 a 500 mm.",
+  nome_do_gato_invalido: "O nome aceita até 30 letras.",
   angulos_invalidos:
     "Os ângulos vão de 0° a 180° e precisam ser diferentes entre si.",
   conflito_de_versao:
@@ -43,7 +44,7 @@ export function messageFor(error: unknown, status?: Status | null): string {
     }
   }
   if (error.motivo === "ocupado" && status?.estado === "vazio") {
-    return "O alimentador está parado: a última porção não saiu. Confira a garrafa e toque em “Entendi”.";
+    return "O comedouro está parado: a última porção não saiu. Confira a garrafa e toque em “Entendi”.";
   }
   return MOTIVOS[error.motivo] ?? (MOTIVOS.erro_interno as string);
 }
@@ -51,6 +52,98 @@ export function messageFor(error: unknown, status?: Status | null): string {
 // Só a recusa pela tigela pode ser contornada com "servir mesmo assim".
 export function canForce(error: unknown): boolean {
   return error instanceof ApiError && error.motivo === "tigela_com_racao";
+}
+
+// Os três estados do guia de UI/UX: tudo bem, aviso e problema.
+export type Tone = "ok" | "warn" | "bad";
+
+// Uma recusa (uma regra, um pedido negado, um campo errado) é aviso. Uma falha é problema.
+export function toneFor(error: unknown): "warn" | "bad" {
+  if (!(error instanceof ApiError)) return "bad";
+  return [400, 409, 422, 429].includes(error.status) ? "warn" : "bad";
+}
+
+const CAMPOS: Record<string, string> = {
+  nome_do_gato_invalido: "nomeDoGato",
+  gramas_por_porcao_invalido: "gramasPorPorcao",
+  limite_diario_invalido: "limiteDiarioPorcoes",
+  agenda_acima_do_limite: "limiteDiarioPorcoes",
+  intervalo_minimo_invalido: "intervaloMinimoMin",
+  horarios_muito_proximos: "intervaloMinimoMin",
+  limite_tigela_invalido: "limiteTigelaGramas",
+  fuso_invalido: "fusoHorario",
+  altura_garrafa_invalida: "alturaGarrafaMm",
+  angulos_invalidos: "anguloServir",
+};
+
+// O campo dos Ajustes que causou o erro, para a mensagem aparecer embaixo dele.
+export function fieldFor(error: unknown): string | null {
+  return error instanceof ApiError ? (CAMPOS[error.motivo] ?? null) : null;
+}
+
+function dayAndTime(iso: string, now: Date): { day: string; time: string } {
+  const date = new Date(iso);
+  const key = (d: Date) => d.toLocaleDateString("pt-BR");
+  const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  const day =
+    key(date) === key(now)
+      ? "hoje"
+      : key(date) === key(yesterday)
+        ? "ontem"
+        : date.toLocaleDateString("pt-BR", {
+            day: "2-digit",
+            month: "2-digit",
+          });
+  return { day, time: formatTime(iso) };
+}
+
+// A frase de situação: o topo da tela inicial responde "está tudo bem?" (guia de UI/UX, seção 6).
+// Quando existe um problema, a frase começa por ele.
+export function situation(status: Status, now: Date = new Date()): string {
+  const nome = status.nomeDoGato.trim() || "Seu gato";
+  const frases: string[] = [];
+  const parado = status.estado === "vazio";
+
+  if (!status.online) {
+    if (status.onlineDesde) {
+      const { day, time } = dayAndTime(status.onlineDesde, now);
+      const desde =
+        day === "hoje"
+          ? `as ${time}`
+          : day === "ontem"
+            ? `ontem às ${time}`
+            : day;
+      frases.push(`Sem contato com o comedouro desde ${desde}.`);
+    } else {
+      frases.push("Sem contato com o comedouro.");
+    }
+  } else if (parado) {
+    frases.push("A última porção não saiu.");
+  }
+
+  if (status.ultimaRefeicao) {
+    const { day, time } = dayAndTime(status.ultimaRefeicao.hora, now);
+    const quando =
+      day === "hoje"
+        ? `às ${time}`
+        : day === "ontem"
+          ? `ontem às ${time}`
+          : `em ${day}, às ${time}`;
+    frases.push(`${nome} comeu ${quando}.`);
+  } else if (frases.length === 0) {
+    frases.push("Nenhuma refeição registrada ainda.");
+  }
+
+  if (status.online && !parado) {
+    const proxima = status.proximaRefeicao;
+    frases.push(
+      proxima
+        ? `Próxima refeição ${proxima.amanha ? "amanhã " : ""}às ${proxima.hora}.`
+        : "Nenhuma refeição ativa na agenda.",
+    );
+  }
+
+  return frases.join(" ");
 }
 
 const ORIGENS: Record<string, string> = {
@@ -124,7 +217,7 @@ export function historyLine(item: HistoryItem): HistoryLine {
     case "sensor_sem_leitura":
       return { title: "Sensor sem leitura", detail: motivo, tone: "bad" };
     case "reiniciou":
-      return { title: "O alimentador reiniciou", detail: "", tone: "warn" };
+      return { title: "O comedouro reiniciou", detail: "", tone: "warn" };
     default:
       return { title: item.tipo, detail: "", tone: "warn" };
   }
@@ -135,12 +228,19 @@ const ALERTAS: Record<string, string> = {
   porcao_nao_saiu: "A porção não saiu",
   refeicao_pulada: "Refeição pulada",
   sensor_sem_leitura: "Sensor sem leitura",
-  reiniciou: "O alimentador reiniciou",
-  offline: "Alimentador offline",
+  reiniciou: "O comedouro reiniciou",
+  offline: "Comedouro offline",
 };
 
 export function alertTitle(tipo: string): string {
   return ALERTAS[tipo] ?? tipo;
+}
+
+// Ração acabando, refeição pulada e reinício são avisos; o resto é problema.
+export function alertTone(tipo: string): "warn" | "bad" {
+  return ["garrafa_baixa", "refeicao_pulada", "reiniciou"].includes(tipo)
+    ? "warn"
+    : "bad";
 }
 
 // Os alertas que só somem quando alguém toca em "Entendi".

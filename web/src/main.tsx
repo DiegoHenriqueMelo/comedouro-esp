@@ -2,6 +2,7 @@ import { registerSW } from "virtual:pwa-register";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
+import "@fontsource-variable/figtree";
 import "./styles.css";
 
 // Registra o service worker (só existe no build; em `pnpm dev` isto não faz nada).
