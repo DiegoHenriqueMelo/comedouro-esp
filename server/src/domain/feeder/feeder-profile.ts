@@ -12,6 +12,8 @@ export type FeederProfileProps = {
   nickname: string;
   kind: FeederKind;
   createdAt: Date;
+  // Quando um aparelho trocou o código de pareamento pela senha. Simulados não pareiam.
+  pairedAt: Date | null;
 };
 
 export class FeederProfile {
@@ -19,9 +21,10 @@ export class FeederProfile {
 
   private constructor(private props: FeederProfileProps) {}
 
-  static create(props: FeederProfileProps): FeederProfile {
+  static create(props: Omit<FeederProfileProps, "pairedAt">): FeederProfile {
     return new FeederProfile({
       ...props,
+      pairedAt: null,
       nickname: FeederProfile.validNickname(props.nickname),
     });
   }
@@ -35,6 +38,19 @@ export class FeederProfile {
       ...this.props,
       nickname: FeederProfile.validNickname(nickname),
     };
+  }
+
+  paired(now: Date): void {
+    this.props = { ...this.props, pairedAt: now };
+  }
+
+  // Um simulado já nasce "pronto"; um aparelho, só depois de parear.
+  get ready(): boolean {
+    return this.props.kind === "simulado" || this.props.pairedAt !== null;
+  }
+
+  get pairedAt(): Date | null {
+    return this.props.pairedAt;
   }
 
   isOwnedBy(userId: string): boolean {

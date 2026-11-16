@@ -66,6 +66,7 @@ export class ServerDeviceFactory implements DeviceFactory {
       run: () => {
         if (this.sim.autoTick) device.startTicking();
       },
+      kick: () => {},
       forget: async () => {
         this.simulated.delete(feederId);
       },
@@ -84,6 +85,7 @@ export class ServerDeviceFactory implements DeviceFactory {
       device,
       simulator: null,
       run: () => {},
+      kick: () => mqtt.disconnect?.(feederId),
       forget: async () => {
         await device.clearRetained();
         mqtt.disconnect?.(feederId);

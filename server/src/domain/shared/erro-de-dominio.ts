@@ -24,6 +24,8 @@ export type CodigoDeErro =
   | "peso_invalido"
   | "limite_de_pets"
   | "foto_invalida"
+  | "codigo_invalido"
+  | "nao_e_aparelho"
   | "conflito_de_versao";
 
 export class ErroDeDominio extends Error {

@@ -8,6 +8,7 @@ import type {
   FeederProfileRepository,
   FeederStorage,
   IdentityVerifier,
+  PairingCodeRepository,
   PetPhotoRepository,
   PetRepository,
   SessionRepository,
@@ -25,6 +26,7 @@ export type SystemParts = {
   storage: FeederStorage;
   devices: DeviceFactory;
   credentials: DeviceCredentialRepository;
+  codes: PairingCodeRepository;
   notifier: UserNotifier;
   clock: Clock;
   users: UserRepository;
@@ -45,6 +47,7 @@ export function buildSystem(parts: SystemParts) {
     storage: parts.storage,
     devices: parts.devices,
     credentials: parts.credentials,
+    codes: parts.codes,
     notifier: parts.notifier,
     clock: parts.clock,
     ...(parts.log ? { log: parts.log } : {}),
@@ -59,5 +62,5 @@ export function buildSystem(parts: SystemParts) {
 
   const pets = new PetService(parts.pets, parts.petPhotos, parts.clock);
 
-  return { catalog, auth, pets };
+  return { catalog, auth, pets, clock: parts.clock };
 }

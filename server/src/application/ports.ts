@@ -10,6 +10,7 @@ import type {
   FeederKind,
   FeederProfile,
 } from "../domain/feeder/feeder-profile.js";
+import type { PairingCode } from "../domain/feeder/pairing-code.js";
 import type { Pet } from "../domain/pet/pet.js";
 import type { PetPhoto } from "../domain/pet/pet-photo.js";
 import type { Identity, User } from "../domain/user/user.js";
@@ -128,6 +129,14 @@ export interface FeederStorage {
   purge(feederId: string): Promise<void>;
 }
 
+export interface PairingCodeRepository {
+  findByCode(code: string): Promise<PairingCode | null>;
+  findByFeeder(feederId: string): Promise<PairingCode | null>;
+  // Um código por comedouro: salvar um novo substitui o anterior daquele comedouro.
+  save(code: PairingCode): Promise<void>;
+  removeByFeeder(feederId: string): Promise<void>;
+}
+
 // O usuário e a senha MQTT de um aparelho. A senha fica só como hash.
 export type DeviceCredential = {
   feederId: string;
@@ -148,6 +157,8 @@ export type DeviceHandle = {
   simulator: SimulatorControls | null;
   // Começa a rodar (o simulado passa a seguir a agenda sozinho).
   run(): void;
+  // Derruba o aparelho conectado agora (pareou de novo: a senha antiga deixou de valer).
+  kick(): void;
   // Esquece o comedouro: o aparelho removido não recebe mais a configuração antiga.
   forget(): Promise<void>;
 };

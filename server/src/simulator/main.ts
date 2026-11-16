@@ -1,3 +1,5 @@
+import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { createInterface } from "node:readline";
 import { loadEnvFiles } from "../env.js";
 import { systemClock } from "../infra/memory/memory-repositories.js";
@@ -12,17 +14,45 @@ const url =
   `mqtt://127.0.0.1:${process.env.MQTT_BROKER_PORT ?? "1883"}`;
 const catEats = Number(process.env.SIM_CAT_EATS_MINUTES ?? "10");
 
-// O simulador entra como um aparelho: com o usuário e a senha que o app mostrou ao criar o comedouro.
-// O usuário é o próprio id do comedouro.
-const username = process.env.SIM_USUARIO;
-const password = process.env.SIM_SENHA;
-if (!username || !password) {
+// O simulador pareia como o ESP32 vai parear: troca o código de 6 dígitos que o app mostra pelo usuário e
+// pela senha MQTT, e guarda os dois num arquivo (no ESP32, na memória permanente, a NVS).
+const server =
+  process.env.SIM_SERVIDOR ?? `http://127.0.0.1:${process.env.PORT ?? "3000"}`;
+const store = resolve(process.env.SIM_ARQUIVO ?? ".simulador.json");
+type Saved = { usuario: string; senha: string };
+
+async function pairWith(codigo: string): Promise<Saved> {
+  const res = await fetch(`${server}/v1/dispositivos/parear`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ codigo }),
+  });
+  const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+  if (!res.ok) {
+    console.error(
+      `[simulador] o servidor recusou o código (${res.status} ${String(body.motivo ?? "")}).`,
+    );
+    process.exit(1);
+  }
+  const saved = { usuario: String(body.usuario), senha: String(body.senha) };
+  writeFileSync(store, JSON.stringify(saved, null, 2));
+  console.log(`[simulador] pareado. Credencial guardada em ${store}.`);
+  return saved;
+}
+
+const codigo = process.env.SIM_CODIGO;
+let saved: Saved | null = null;
+if (codigo) {
+  saved = await pairWith(codigo);
+} else if (existsSync(store)) {
+  saved = JSON.parse(readFileSync(store, "utf8")) as Saved;
+} else {
   console.error(
     [
-      "[simulador] faltam SIM_USUARIO e SIM_SENHA.",
-      "No app, adicione um comedouro do tipo “Tenho um aparelho”: ele mostra o usuário e a senha uma vez só.",
-      "Depois rode, por exemplo:",
-      "  SIM_USUARIO=<usuário> SIM_SENHA=<senha> pnpm simulador",
+      "[simulador] ainda não pareado.",
+      "No app, adicione um comedouro do tipo “Tenho um aparelho”: ele mostra um código de 6 dígitos.",
+      "Depois rode, com o servidor no ar:",
+      "  SIM_CODIGO=<código> pnpm simulador",
     ].join("\n"),
   );
   process.exit(1);
@@ -30,12 +60,20 @@ if (!username || !password) {
 
 const simulator = new MqttSimulator({
   url,
-  feederId: username,
+  feederId: saved.usuario,
   clock: systemClock,
   device: { catEatsAfterMinutes: catEats > 0 ? catEats : null },
   log: (message) => console.log(`[simulador] ${message}`),
-  username,
-  password,
+  username: saved.usuario,
+  password: saved.senha,
+  // Como o ESP32 (F6): esquece a credencial e volta a esperar um código.
+  onRefused: () => {
+    rmSync(store, { force: true });
+    console.log(
+      "[simulador] credencial apagada. Gere um código no app e rode com SIM_CODIGO=<código>.",
+    );
+    process.exit(1);
+  },
 });
 simulator.startTicking();
 

@@ -10,6 +10,7 @@ import type { System } from "../composition.js";
 import type { CommandResult } from "../domain/device/device.js";
 import { TIME_ZONES } from "../domain/feeder/configuration.js";
 import type { Feeder } from "../domain/feeder/feeder.js";
+import type { PairingCode } from "../domain/feeder/pairing-code.js";
 import type { User } from "../domain/user/user.js";
 
 export type PushDeps = {
@@ -98,6 +99,16 @@ async function summary(runtime: FeederRuntime) {
     criadoEm: runtime.profile.createdAt.toISOString(),
     online,
     alertas: (await runtime.alerts.list()).length,
+    // Aparelho que ainda não trocou o código pela senha. Simulado está sempre pareado.
+    pareado: runtime.profile.ready,
+  };
+}
+
+function codeDto(code: PairingCode | null) {
+  return {
+    codigo: code
+      ? { codigo: code.code, expiraEm: code.expiresAt.toISOString() }
+      : null,
   };
 }
 
@@ -143,14 +154,14 @@ export function registerRoutes(system: System, push: PushDeps) {
 
     app.post("/comedouros", async (request, reply) => {
       const body = newFeederSchema.parse(request.body);
-      const { runtime, credential } = await catalog.create(
+      const { runtime, code } = await catalog.create(
         userOf(request).id,
         body.apelido,
         body.tipo,
       );
       return reply
         .code(201)
-        .send({ comedouro: await summary(runtime), credencial: credential });
+        .send({ comedouro: await summary(runtime), ...codeDto(code) });
     });
 
     // Tudo o que é de um comedouro só: /v1/comedouros/:id/...
@@ -220,8 +231,33 @@ function registerFeederRoutes(app: FastifyInstance, system: System) {
       apelido: runtime.profile.nickname,
       tipo: runtime.profile.kind,
       simulado: runtime.profile.kind === "simulado",
+      pareado: runtime.profile.ready,
+      pareadoEm: runtime.profile.pairedAt?.toISOString() ?? null,
     };
   });
+
+  // O código de pareamento: o que ainda vale, ou um novo (o anterior deixa de valer).
+  app.get("/codigo", async (request) =>
+    codeDto(
+      await catalog.currentPairingCode(
+        userOf(request).id,
+        feederOf(request).id,
+      ),
+    ),
+  );
+
+  app.post("/codigo", async (request, reply) =>
+    reply
+      .code(201)
+      .send(
+        codeDto(
+          await catalog.issuePairingCode(
+            userOf(request).id,
+            feederOf(request).id,
+          ),
+        ),
+      ),
+  );
 
   // Só nos simulados: mexe no "mundo físico" para testar recusas e avisos sem a placa.
   app.post("/simulador", async (request, reply) => {

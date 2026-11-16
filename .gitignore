@@ -147,3 +147,6 @@ vite.config.ts.timestamp-*
 
 # Turbo Repo
 .turbo
+
+# Credencial do pnpm simulador (o "ESP32 de mentira")
+.simulador.json

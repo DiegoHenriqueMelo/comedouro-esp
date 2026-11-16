@@ -1,8 +1,9 @@
-import { randomUUID } from "node:crypto";
+import { randomInt, randomUUID } from "node:crypto";
 import {
   type FeederKind,
   FeederProfile,
 } from "../domain/feeder/feeder-profile.js";
+import { PairingCode } from "../domain/feeder/pairing-code.js";
 import {
   ErroDeDominio,
   NaoEncontrado,
@@ -15,6 +16,7 @@ import type {
   DeviceFactory,
   FeederProfileRepository,
   FeederStorage,
+  PairingCodeRepository,
   UserNotifier,
 } from "./ports.js";
 
@@ -32,12 +34,13 @@ export type CatalogDeps = {
   storage: FeederStorage;
   devices: DeviceFactory;
   credentials: DeviceCredentialRepository;
+  codes: PairingCodeRepository;
   notifier: UserNotifier;
   clock: Clock;
   log?: Log;
 };
 
-// O usuário e a senha MQTT de um aparelho novo. Aparecem uma vez só, na criação.
+// O que o aparelho recebe ao parear: o usuário e a senha MQTT. Aparecem uma vez só.
 export type NewDeviceCredential = { usuario: string; senha: string };
 
 const silent: Log = { warn: () => {}, error: () => {} };
@@ -78,10 +81,7 @@ export class FeederCatalog {
     ownerId: string,
     nickname: string,
     kind: FeederKind,
-  ): Promise<{
-    runtime: FeederRuntime;
-    credential: NewDeviceCredential | null;
-  }> {
+  ): Promise<{ runtime: FeederRuntime; code: PairingCode | null }> {
     if (kind === "aparelho" && !this.deps.devices.supportsHardware) {
       throw new ErroDeDominio(
         "aparelho_indisponivel",
@@ -113,19 +113,70 @@ export class FeederCatalog {
       createdAt: this.deps.clock.now(),
     });
 
-    let credential: NewDeviceCredential | null = null;
-    if (kind === "aparelho") {
-      const senha = newDevicePassword();
-      await this.deps.credentials.save({
-        feederId: profile.id,
-        username: profile.id,
-        passwordHash: await hashPassword(senha),
-      });
-      credential = { usuario: profile.id, senha };
+    await this.deps.profiles.save(profile);
+    const runtime = await this.start(profile);
+    // Um aparelho nasce esperando o pareamento: o app já mostra o código.
+    const code = kind === "aparelho" ? await this.newCode(profile.id) : null;
+    return { runtime, code };
+  }
+
+  // Um código novo para parear (ou parear de novo) o aparelho. O anterior deixa de valer.
+  async issuePairingCode(
+    ownerId: string,
+    feederId: string,
+  ): Promise<PairingCode> {
+    const runtime = await this.get(ownerId, feederId);
+    if (runtime.profile.kind !== "aparelho") {
+      throw new ErroDeDominio(
+        "nao_e_aparelho",
+        "só um comedouro de aparelho tem código de pareamento",
+      );
+    }
+    return this.newCode(feederId);
+  }
+
+  // O código que ainda vale, se houver: abrir a tela de novo não precisa gerar outro.
+  async currentPairingCode(
+    ownerId: string,
+    feederId: string,
+  ): Promise<PairingCode | null> {
+    await this.get(ownerId, feederId);
+    const code = await this.deps.codes.findByFeeder(feederId);
+    return code?.isActiveAt(this.deps.clock.now()) ? code : null;
+  }
+
+  // O aparelho troca o código pela senha MQTT. Parear de novo troca a senha e derruba o aparelho antigo;
+  // a agenda, os ajustes e o histórico continuam.
+  async pair(codeText: string): Promise<NewDeviceCredential> {
+    const now = this.deps.clock.now();
+    const code = await this.deps.codes.findByCode(codeText);
+    if (!code) {
+      throw new ErroDeDominio("codigo_invalido", "código inválido ou vencido");
+    }
+    code.use(now);
+    await this.deps.codes.save(code);
+
+    const profile = await this.deps.profiles.findById(code.feederId);
+    if (!profile) {
+      throw new ErroDeDominio("codigo_invalido", "código inválido ou vencido");
     }
 
+    const senha = newDevicePassword();
+    await this.deps.credentials.removeByFeeder(profile.id);
+    await this.deps.credentials.save({
+      feederId: profile.id,
+      username: profile.id,
+      passwordHash: await hashPassword(senha),
+    });
+
+    profile.paired(now);
     await this.deps.profiles.save(profile);
-    return { runtime: await this.start(profile), credential };
+    const runtime = this.runtimes.get(profile.id);
+    if (runtime) {
+      runtime.profile = profile;
+      runtime.handle.kick();
+    }
+    return { usuario: profile.id, senha };
   }
 
   async get(ownerId: string, feederId: string): Promise<FeederRuntime> {
@@ -160,6 +211,7 @@ export class FeederCatalog {
     this.runtimes.delete(feederId);
     // Primeiro a credencial: o aparelho derrubado não consegue entrar de novo.
     await this.deps.credentials.removeByFeeder(feederId);
+    await this.deps.codes.removeByFeeder(feederId);
     // Ainda conectado, o servidor limpa as mensagens retidas; só depois desliga.
     await runtime.handle.forget();
     await runtime.stop();
@@ -180,6 +232,20 @@ export class FeederCatalog {
   async close(): Promise<void> {
     for (const runtime of this.runtimes.values()) await runtime.stop();
     this.runtimes.clear();
+  }
+
+  // Seis dígitos ao acaso, sem repetir um código que ainda vale em outro comedouro.
+  private async newCode(feederId: string): Promise<PairingCode> {
+    const now = this.deps.clock.now();
+    for (let attempt = 0; attempt < 20; attempt++) {
+      const text = String(randomInt(0, 1_000_000)).padStart(6, "0");
+      const taken = await this.deps.codes.findByCode(text);
+      if (taken?.isActiveAt(now)) continue;
+      const code = PairingCode.issue(feederId, text, now);
+      await this.deps.codes.save(code);
+      return code;
+    }
+    throw new Error("não achei um código de pareamento livre");
   }
 
   private async runtimeOf(profile: FeederProfile): Promise<FeederRuntime> {

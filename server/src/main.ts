@@ -6,6 +6,7 @@ import type {
   DeviceCredentialRepository,
   FeederProfileRepository,
   FeederStorage,
+  PairingCodeRepository,
   PetPhotoRepository,
   PetRepository,
   PushSubscriptionRepository,
@@ -25,6 +26,7 @@ import {
   MemoryDeviceCredentialRepository,
   MemoryFeederProfileRepository,
   MemoryFeederStorage,
+  MemoryPairingCodeRepository,
   MemoryPetPhotoRepository,
   MemoryPetRepository,
   MemoryPushSubscriptionRepository,
@@ -36,6 +38,7 @@ import {
   MongoDeviceCredentialRepository,
   MongoFeederProfileRepository,
   MongoFeederStorage,
+  MongoPairingCodeRepository,
   MongoPetPhotoRepository,
   MongoPetRepository,
   MongoPushSubscriptionRepository,
@@ -64,6 +67,7 @@ let mongo: MongoClient | null = null;
 let storage: FeederStorage;
 let profiles: FeederProfileRepository;
 let credentials: DeviceCredentialRepository;
+let codes: PairingCodeRepository;
 let subscriptions: PushSubscriptionRepository;
 let users: UserRepository;
 let sessions: SessionRepository;
@@ -82,6 +86,7 @@ if (config.mongo) {
   const mongoUsers = new MongoUserRepository(db);
   const mongoSessions = new MongoSessionRepository(db);
   const mongoPets = new MongoPetRepository(db);
+  const mongoCodes = new MongoPairingCodeRepository(db);
   for (const repository of [
     mongoStorage,
     mongoProfiles,
@@ -90,6 +95,7 @@ if (config.mongo) {
     mongoUsers,
     mongoSessions,
     mongoPets,
+    mongoCodes,
   ]) {
     await repository.ensureIndexes();
   }
@@ -97,6 +103,7 @@ if (config.mongo) {
   storage = mongoStorage;
   profiles = mongoProfiles;
   credentials = mongoCredentials;
+  codes = mongoCodes;
   subscriptions = mongoSubscriptions;
   users = mongoUsers;
   sessions = mongoSessions;
@@ -107,6 +114,7 @@ if (config.mongo) {
   storage = new MemoryFeederStorage();
   profiles = new MemoryFeederProfileRepository();
   credentials = new MemoryDeviceCredentialRepository();
+  codes = new MemoryPairingCodeRepository();
   subscriptions = new MemoryPushSubscriptionRepository();
   users = new MemoryUserRepository();
   sessions = new MemorySessionRepository();
@@ -177,6 +185,7 @@ const system = buildSystem({
   storage,
   devices,
   credentials,
+  codes,
   notifier,
   clock,
   users,
@@ -196,6 +205,7 @@ const app = buildApp({
     notifier,
   },
   auth: config.auth,
+  pairing: { mqttPort: config.broker?.port ?? 1883 },
   webDist: config.webDist,
 });
 

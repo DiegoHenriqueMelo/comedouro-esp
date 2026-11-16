@@ -37,6 +37,7 @@ describe("comedouros da conta", () => {
           criadoEm: expect.any(String),
           online: true,
           alertas: 1, // o "reiniciou" de quando o simulado liga
+          pareado: true,
         },
       ],
     });
@@ -75,25 +76,33 @@ describe("comedouros da conta", () => {
       expect(res.json().motivo).toBe("aparelho_indisponivel");
     });
 
-    it("aparelho: devolve o usuário e a senha MQTT uma vez, e guarda só o hash", async () => {
+    it("aparelho: nasce esperando o pareamento, com um código de 6 dígitos e sem senha", async () => {
       t = await buildTestSystem({ supportsHardware: true });
 
       const res = await create({ apelido: " Sala ", tipo: "aparelho" });
 
       expect(res.statusCode).toBe(201);
-      const { comedouro, credencial } = res.json();
-      expect(comedouro).toMatchObject({ apelido: "Sala", tipo: "aparelho" });
-      expect(credencial.usuario).toBe(comedouro.id);
-      expect(credencial.senha.length).toBeGreaterThanOrEqual(20);
+      const { comedouro, codigo } = res.json();
+      expect(comedouro).toMatchObject({
+        apelido: "Sala",
+        tipo: "aparelho",
+        pareado: false,
+      });
+      expect(codigo.codigo).toMatch(/^\d{6}$/);
+      expect(
+        new Date(codigo.expiraEm).getTime() - t.clock.now().getTime(),
+      ).toBe(10 * 60_000);
+      expect(await t.credentials.findByUsername(comedouro.id)).toBeNull();
+    });
 
-      const saved = await t.credentials.findByUsername(credencial.usuario);
-      expect(saved?.passwordHash).toMatch(/^scrypt:/);
-      expect(saved?.passwordHash).not.toContain(credencial.senha);
+    it("simulado: não tem código", async () => {
+      t = await buildTestSystem();
+      await t.inject({ method: "DELETE", url: t.base });
 
-      const list = (
-        await t.inject({ method: "GET", url: "/v1/comedouros" })
-      ).json();
-      expect(list.comedouros).toHaveLength(2);
+      const res = await create({ apelido: "Sala", tipo: "simulado" });
+
+      expect(res.json().codigo).toBeNull();
+      expect(res.json().comedouro.pareado).toBe(true);
     });
 
     it("apelido vazio ou com mais de 30 letras: 422 apelido_invalido", async () => {
@@ -189,18 +198,25 @@ describe("comedouros da conta", () => {
       ).toEqual([]);
     });
 
-    it("remover um aparelho apaga a credencial: ele não entra mais no broker", async () => {
+    it("remover um aparelho apaga a credencial e o código: ele não entra mais no broker", async () => {
       t = await buildTestSystem({ supportsHardware: true });
-      const { comedouro, credencial } = (
+      const { comedouro, codigo } = (
         await create({ apelido: "Sala", tipo: "aparelho" })
       ).json();
+      const pair = await t.app.inject({
+        method: "POST",
+        url: "/v1/dispositivos/parear",
+        payload: { codigo: codigo.codigo },
+      });
+      expect(pair.statusCode).toBe(200);
 
       await t.inject({
         method: "DELETE",
         url: `/v1/comedouros/${comedouro.id}`,
       });
 
-      expect(await t.credentials.findByUsername(credencial.usuario)).toBeNull();
+      expect(await t.credentials.findByUsername(comedouro.id)).toBeNull();
+      expect(await t.codes.findByFeeder(comedouro.id)).toBeNull();
     });
   });
 

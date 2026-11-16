@@ -15,6 +15,10 @@ import {
   requireUser,
   toUserDto,
 } from "./http/auth-routes.js";
+import {
+  type PairingOptions,
+  registerPairingRoutes,
+} from "./http/pairing-routes.js";
 import { registerPetRoutes } from "./http/pet-routes.js";
 import { type PushDeps, registerRoutes } from "./http/routes.js";
 
@@ -24,6 +28,7 @@ export type AppOptions = {
   system: System;
   push: PushDeps;
   auth: AuthOptions;
+  pairing: PairingOptions;
   // A pasta com o build do PWA (web/dist). Sem ela, o servidor só responde a API.
   webDist?: string | null;
 };
@@ -109,6 +114,14 @@ export function buildApp(options: AppOptions) {
     async (v1) => {
       // Abertas: login, sair e as opções da tela de login.
       await v1.register(registerAuthRoutes(auth, options.auth));
+      // Aberta também: quem chama é o ESP32, que ainda não tem conta nem senha.
+      await v1.register(
+        registerPairingRoutes(
+          options.system.catalog,
+          options.system.clock,
+          options.pairing,
+        ),
+      );
 
       // Todo o resto exige sessão.
       await v1.register(async (privateScope) => {

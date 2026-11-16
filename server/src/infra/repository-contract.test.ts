@@ -9,6 +9,7 @@ import type {
   FeederProfileRepository,
   FeederRepository,
   FeederStorage,
+  PairingCodeRepository,
   PetPhotoRepository,
   PetRepository,
   PushSubscriptionRepository,
@@ -18,6 +19,7 @@ import type {
 import type { DeviceEvent } from "../domain/device/device.js";
 import { Feeder } from "../domain/feeder/feeder.js";
 import { FeederProfile } from "../domain/feeder/feeder-profile.js";
+import { PairingCode } from "../domain/feeder/pairing-code.js";
 import { Pet } from "../domain/pet/pet.js";
 import { User } from "../domain/user/user.js";
 import {
@@ -28,6 +30,7 @@ import {
   MemoryFeederProfileRepository,
   MemoryFeederRepository,
   MemoryFeederStorage,
+  MemoryPairingCodeRepository,
   MemoryPetPhotoRepository,
   MemoryPetRepository,
   MemoryPushSubscriptionRepository,
@@ -42,6 +45,7 @@ import {
   MongoFeederProfileRepository,
   MongoFeederRepository,
   MongoFeederStorage,
+  MongoPairingCodeRepository,
   MongoPetPhotoRepository,
   MongoPetRepository,
   MongoPushSubscriptionRepository,
@@ -65,6 +69,7 @@ type Repositories = {
   storage: FeederStorage;
   pets: PetRepository;
   photos: PetPhotoRepository;
+  codes: PairingCodeRepository;
 };
 
 const cafe = fromScheduleDto([{ hora: "07:30", porcoes: 2, ativo: true }]);
@@ -310,6 +315,39 @@ function contract(name: string, create: () => Promise<Repositories>) {
       });
     });
 
+    describe("códigos de pareamento", () => {
+      it("um por comedouro: o novo substitui o anterior", async () => {
+        await r.codes.save(PairingCode.issue("f1", "111111", at(0)));
+        await r.codes.save(PairingCode.issue("f1", "222222", at(1)));
+
+        expect((await r.codes.findByFeeder("f1"))?.code).toBe("222222");
+        expect(await r.codes.findByCode("111111")).toBeNull();
+        expect((await r.codes.findByCode("222222"))?.feederId).toBe("f1");
+      });
+
+      it("guarda o uso, e o mesmo número em outro comedouro devolve o mais recente", async () => {
+        const old = PairingCode.issue("f1", "333333", at(0));
+        old.use(at(1));
+        await r.codes.save(old);
+        await r.codes.save(PairingCode.issue("f2", "333333", at(30)));
+
+        const found = await r.codes.findByCode("333333");
+        expect(found?.feederId).toBe("f2");
+        expect(found?.isActiveAt(at(31))).toBe(true);
+        expect((await r.codes.findByFeeder("f1"))?.isActiveAt(at(2))).toBe(
+          false,
+        );
+      });
+
+      it("apaga pelo comedouro", async () => {
+        await r.codes.save(PairingCode.issue("f1", "444444", at(0)));
+        await r.codes.removeByFeeder("f1");
+
+        expect(await r.codes.findByFeeder("f1")).toBeNull();
+        expect(await r.codes.findByCode("444444")).toBeNull();
+      });
+    });
+
     describe("pets", () => {
       const pet = (id: string, ownerId: string) =>
         Pet.create(
@@ -441,6 +479,7 @@ contract("memória", async () => ({
   storage: new MemoryFeederStorage(),
   pets: new MemoryPetRepository(),
   photos: new MemoryPetPhotoRepository(),
+  codes: new MemoryPairingCodeRepository(),
 }));
 
 // Os testes do MongoDB precisam de um banco no ar: `docker compose up -d mongo` na raiz do repo.
@@ -505,6 +544,7 @@ describe.skipIf(!(await mongoIsUp()))("MongoDB", () => {
       storage,
       pets: new MongoPetRepository(db),
       photos: new MongoPetPhotoRepository(db),
+      codes: new MongoPairingCodeRepository(db),
     };
   });
 });

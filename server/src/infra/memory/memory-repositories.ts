@@ -19,6 +19,7 @@ import type {
   FeederRepository,
   FeederStorage,
   IdentityVerifier,
+  PairingCodeRepository,
   PetPhotoRepository,
   PetRepository,
   PushSubscription,
@@ -34,6 +35,10 @@ import {
   FeederProfile,
   type FeederProfileProps,
 } from "../../domain/feeder/feeder-profile.js";
+import {
+  PairingCode,
+  type PairingCodeProps,
+} from "../../domain/feeder/pairing-code.js";
 import { Pet, type PetProps } from "../../domain/pet/pet.js";
 import type { PetPhoto } from "../../domain/pet/pet-photo.js";
 import { ErroDeDominio } from "../../domain/shared/erro-de-dominio.js";
@@ -356,5 +361,30 @@ export class MemoryPetPhotoRepository implements PetPhotoRepository {
 
   has(petId: string): boolean {
     return this.byPet.has(petId);
+  }
+}
+
+export class MemoryPairingCodeRepository implements PairingCodeRepository {
+  private readonly byFeeder = new Map<string, PairingCodeProps>();
+
+  async findByCode(code: string): Promise<PairingCode | null> {
+    // O mesmo número pode ter sido usado antes por outro comedouro: vale o mais recente.
+    const matches = [...this.byFeeder.values()]
+      .filter((c) => c.code === code)
+      .sort((a, b) => b.expiresAt.getTime() - a.expiresAt.getTime());
+    return matches[0] ? PairingCode.restore(matches[0]) : null;
+  }
+
+  async findByFeeder(feederId: string): Promise<PairingCode | null> {
+    const props = this.byFeeder.get(feederId);
+    return props ? PairingCode.restore(props) : null;
+  }
+
+  async save(code: PairingCode): Promise<void> {
+    this.byFeeder.set(code.feederId, code.toProps());
+  }
+
+  async removeByFeeder(feederId: string): Promise<void> {
+    this.byFeeder.delete(feederId);
   }
 }

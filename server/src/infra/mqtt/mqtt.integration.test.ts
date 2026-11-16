@@ -65,7 +65,13 @@ describe("MQTT: servidor, broker e dispositivo", () => {
         status: new MemoryDeviceStatusRepository(),
         alerts: new MemoryAlertRepository(),
       },
-      { device, simulator: null, run: () => {}, forget: async () => {} },
+      {
+        device,
+        simulator: null,
+        run: () => {},
+        kick: () => {},
+        forget: async () => {},
+      },
       new MemoryNotifier(),
       clock,
     );

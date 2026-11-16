@@ -19,6 +19,7 @@ import type {
   FeederRepositories,
   FeederRepository,
   FeederStorage,
+  PairingCodeRepository,
   PetPhotoRepository,
   PetRepository,
   PushSubscription,
@@ -37,6 +38,10 @@ import {
   FeederProfile,
   type FeederProfileProps,
 } from "../../domain/feeder/feeder-profile.js";
+import {
+  PairingCode,
+  type PairingCodeProps,
+} from "../../domain/feeder/pairing-code.js";
 import { Pet, type PetProps } from "../../domain/pet/pet.js";
 import type { PetPhoto, PhotoType } from "../../domain/pet/pet-photo.js";
 import { ErroDeDominio } from "../../domain/shared/erro-de-dominio.js";
@@ -445,7 +450,12 @@ export class MongoFeederProfileRepository implements FeederProfileRepository {
 
 function toProfile(doc: ProfileDoc): FeederProfile {
   const { _id, ...rest } = doc;
-  return FeederProfile.restore({ id: _id, ...rest });
+  // Perfis criados antes da P4 não têm o campo.
+  return FeederProfile.restore({
+    id: _id,
+    ...rest,
+    pairedAt: rest.pairedAt ?? null,
+  });
 }
 
 type CredentialDoc = Omit<DeviceCredential, "username"> & { _id: string };
@@ -543,4 +553,52 @@ export class MongoPetPhotoRepository implements PetPhotoRepository {
   async remove(petId: string): Promise<void> {
     await this.collection.deleteOne({ _id: petId });
   }
+}
+
+// Um código por comedouro: o _id é o id do comedouro, e um código novo substitui o anterior.
+type CodeDoc = Omit<PairingCodeProps, "feederId"> & { _id: string };
+
+export class MongoPairingCodeRepository implements PairingCodeRepository {
+  private readonly collection: Collection<CodeDoc>;
+
+  constructor(db: Db) {
+    this.collection = db.collection<CodeDoc>("pairing_codes");
+  }
+
+  async ensureIndexes(): Promise<void> {
+    await this.collection.createIndex({ code: 1, expiresAt: -1 });
+    // Uma hora depois de vencer, o próprio Mongo apaga.
+    await this.collection.createIndex(
+      { expiresAt: 1 },
+      { expireAfterSeconds: 3600 },
+    );
+  }
+
+  async findByCode(code: string): Promise<PairingCode | null> {
+    const [doc] = await this.collection
+      .find({ code })
+      .sort({ expiresAt: -1 })
+      .limit(1)
+      .toArray();
+    return doc ? toCode(doc) : null;
+  }
+
+  async findByFeeder(feederId: string): Promise<PairingCode | null> {
+    const doc = await this.collection.findOne({ _id: feederId });
+    return doc ? toCode(doc) : null;
+  }
+
+  async save(code: PairingCode): Promise<void> {
+    const { feederId, ...rest } = code.toProps();
+    await this.collection.replaceOne({ _id: feederId }, rest, { upsert: true });
+  }
+
+  async removeByFeeder(feederId: string): Promise<void> {
+    await this.collection.deleteOne({ _id: feederId });
+  }
+}
+
+function toCode(doc: CodeDoc): PairingCode {
+  const { _id, ...rest } = doc;
+  return PairingCode.restore({ feederId: _id, ...rest });
 }

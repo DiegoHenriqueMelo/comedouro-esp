@@ -25,6 +25,8 @@ export type MqttSimulatorOptions = {
   // Quanto esperar o `sync` do servidor antes de começar sozinho (primeira vez, sem servidor).
   syncWaitMs?: number;
   log?: (message: string) => void;
+  // O broker recusou a senha: o comedouro foi removido ou pareado de novo em outro aparelho.
+  onRefused?: () => void;
 };
 
 // O "ESP32 de mentira": conversa com o servidor pelo broker, exatamente como o firmware vai conversar.
@@ -86,8 +88,11 @@ export class MqttSimulator {
     this.client.on("error", (err) => {
       const code = (err as { code?: number }).code;
       if (code === 4 || code === 5) {
-        this.log("credencial recusada pelo broker: o comedouro foi removido?");
+        this.log(
+          "credencial recusada pelo broker: o comedouro foi removido, ou pareado em outro aparelho.",
+        );
         this.client.end(true);
+        options.onRefused?.();
       }
     });
     this.client.on("close", () => this.log("desconectado do broker"));

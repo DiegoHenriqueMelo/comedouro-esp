@@ -11,6 +11,7 @@ import {
   MemoryFeederProfileRepository,
   MemoryFeederStorage,
   MemoryNotifier,
+  MemoryPairingCodeRepository,
   MemoryPetPhotoRepository,
   MemoryPetRepository,
   MemoryPushSubscriptionRepository,
@@ -55,6 +56,7 @@ export async function buildTestSystem(
   const storage = new MemoryFeederStorage();
   const profiles = new MemoryFeederProfileRepository();
   const credentials = new MemoryDeviceCredentialRepository();
+  const codes = new MemoryPairingCodeRepository();
   const google = new FakeIdentityVerifier();
   const users = new MemoryUserRepository();
   const sessions = new MemorySessionRepository();
@@ -66,6 +68,7 @@ export async function buildTestSystem(
     storage,
     devices,
     credentials,
+    codes,
     notifier,
     clock,
     users,
@@ -84,6 +87,7 @@ export async function buildTestSystem(
       secureCookie: false,
       ...options.auth,
     },
+    pairing: { mqttPort: 1883 },
   });
 
   // Uma conta já logada: os testes de API usam `inject`, que manda o cookie dela.
@@ -111,6 +115,7 @@ export async function buildTestSystem(
     storage,
     profiles,
     credentials,
+    codes,
     notifier,
     subscriptions,
     google,
