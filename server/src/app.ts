@@ -28,6 +28,11 @@ export type AppOptions = {
   webDist?: string | null;
 };
 
+// Um corpo que não dá para ler: bytes fora do UTF-8, ou JSON quebrado.
+class TextoInvalido extends Error {
+  readonly statusCode = 400;
+}
+
 // Monta o Fastify sem abrir porta: os testes usam `app.inject()`, e o `main.ts` chama o `listen`.
 export function buildApp(options: AppOptions) {
   const app = options.loggerInstance
@@ -57,6 +62,9 @@ export function buildApp(options: AppOptions) {
       });
     }
     const statusCode = (error as { statusCode?: number }).statusCode;
+    if (error instanceof TextoInvalido) {
+      return reply.code(400).send({ motivo: "texto_invalido" });
+    }
     if (statusCode === 413) {
       return reply.code(413).send({ motivo: "grande_demais" });
     }
@@ -67,6 +75,28 @@ export function buildApp(options: AppOptions) {
     request.log.error({ err: error }, "erro inesperado");
     return reply.code(500).send({ motivo: "erro_interno" });
   });
+
+  // JSON só em UTF-8 válido. O leitor padrão troca bytes inválidos por "�" sem avisar, e o nome
+  // estragado ia parar no banco. Aqui, o pedido é recusado (400) e nada é salvo.
+  app.removeContentTypeParser("application/json");
+  app.addContentTypeParser(
+    "application/json",
+    { parseAs: "buffer" },
+    (_request, body, done) => {
+      let text: string;
+      try {
+        text = new TextDecoder("utf-8", { fatal: true }).decode(body as Buffer);
+      } catch {
+        return done(new TextoInvalido("o corpo não é UTF-8 válido"));
+      }
+      if (text.trim() === "") return done(null, undefined);
+      try {
+        done(null, JSON.parse(text));
+      } catch {
+        done(new TextoInvalido("o corpo não é um JSON válido"));
+      }
+    },
+  );
 
   app.register(fastifyCookie);
   app.decorateRequest("user", null);

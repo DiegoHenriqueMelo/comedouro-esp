@@ -92,6 +92,50 @@ describe("pets", () => {
     expect(res.json().motivo).toBe(motivo);
   });
 
+  describe("acentos", () => {
+    const raw = (body: Buffer) =>
+      t.inject({
+        method: "POST",
+        url: "/v1/pets",
+        payload: body,
+        headers: { "content-type": "application/json" },
+      });
+
+    it("o nome com ç e acento, em UTF-8, chega inteiro", async () => {
+      t = await buildTestSystem();
+
+      const res = await raw(
+        Buffer.from(JSON.stringify({ nome: "Paçoca Ü", especie: "cachorro" })),
+      );
+
+      expect(res.statusCode).toBe(201);
+      expect(res.json().nome).toBe("Paçoca Ü");
+    });
+
+    it("bytes que não são UTF-8 (o ç em Latin-1): 400 texto_invalido, e nada é salvo", async () => {
+      t = await buildTestSystem();
+
+      const res = await raw(
+        Buffer.from('{"nome":"Paçoca","especie":"cachorro"}', "latin1"),
+      );
+
+      expect(res.statusCode).toBe(400);
+      expect(res.json()).toEqual({ motivo: "texto_invalido" });
+      expect(
+        (await t.inject({ method: "GET", url: "/v1/pets" })).json(),
+      ).toEqual([]);
+    });
+
+    it("JSON quebrado: 400 texto_invalido", async () => {
+      t = await buildTestSystem();
+
+      const res = await raw(Buffer.from('{"nome": '));
+
+      expect(res.statusCode).toBe(400);
+      expect(res.json()).toEqual({ motivo: "texto_invalido" });
+    });
+  });
+
   it("forma errada (peso em texto) é 400", async () => {
     t = await buildTestSystem();
 
