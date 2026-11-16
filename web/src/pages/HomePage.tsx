@@ -22,8 +22,8 @@ import {
 } from "../ui";
 
 // A tela inicial segue a hierarquia do guia: "está tudo bem?", depois a ação, depois os números.
-export function HomePage() {
-  const status = useLoad(api.status, 3000);
+export function HomePage(props: { feederId: string }) {
+  const status = useLoad(() => api.status(props.feederId), 3000);
 
   if (status.loading) return <Loading />;
   if (!status.data) {
@@ -39,7 +39,7 @@ export function HomePage() {
   return (
     <>
       <header className="page-header">
-        <h1>Comedouro</h1>
+        <h1>{s.apelido}</h1>
         <div className="header-state">
           {s.simulado && <span className="legend">Simulado</span>}
           <StateLine tone={s.online ? "ok" : "bad"}>
@@ -56,8 +56,8 @@ export function HomePage() {
         </Notice>
       )}
 
-      <Alerts status={s} onDone={status.reload} />
-      <ServeCard status={s} onDone={status.reload} />
+      <Alerts feederId={props.feederId} status={s} onDone={status.reload} />
+      <ServeCard feederId={props.feederId} status={s} onDone={status.reload} />
       <Indicators status={s} />
 
       {s.config.sincronizado ? (
@@ -77,6 +77,7 @@ export function HomePage() {
 
 // O bloco principal da tela: servir agora.
 export function ServeCard(props: {
+  feederId: string;
   status: Status;
   onDone: () => Promise<void>;
 }) {
@@ -90,7 +91,7 @@ export function ServeCard(props: {
     await action.run(
       async () => {
         try {
-          await api.feed(porcoes, forcar);
+          await api.feed(props.feederId, porcoes, forcar);
         } catch (err) {
           setRefused(err);
           throw err;
@@ -140,13 +141,17 @@ export function ServeCard(props: {
   );
 }
 
-function Alerts(props: { status: Status; onDone: () => Promise<void> }) {
+function Alerts(props: {
+  feederId: string;
+  status: Status;
+  onDone: () => Promise<void>;
+}) {
   const action = useAction();
   const { alertas } = props.status;
   if (alertas.length === 0) return null;
 
   const acknowledge = async () => {
-    await action.run(() => api.acknowledgeAlerts(), {
+    await action.run(() => api.acknowledgeAlerts(props.feederId), {
       ok: "Alertas fechados.",
       error: (err) => messageFor(err),
     });

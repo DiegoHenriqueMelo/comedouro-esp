@@ -20,12 +20,12 @@ describe("ServeCard", () => {
   it("serve a quantidade escolhida e confirma", async () => {
     const feed = vi.spyOn(api, "feed").mockResolvedValue({});
     const onDone = vi.fn().mockResolvedValue(undefined);
-    render(<ServeCard status={status()} onDone={onDone} />);
+    render(<ServeCard feederId="f1" status={status()} onDone={onDone} />);
 
     await userEvent.click(screen.getByRole("button", { name: "Aumentar" }));
     await userEvent.click(screen.getByRole("button", { name: "Servir agora" }));
 
-    expect(feed).toHaveBeenCalledWith(2, false);
+    expect(feed).toHaveBeenCalledWith("f1", 2, false);
     expect(await screen.findByText("Porções a caminho.")).toBeInTheDocument();
     expect(onDone).toHaveBeenCalled();
   });
@@ -36,7 +36,11 @@ describe("ServeCard", () => {
       .mockRejectedValueOnce(new ApiError(429, "tigela_com_racao"))
       .mockResolvedValueOnce({});
     render(
-      <ServeCard status={status()} onDone={vi.fn().mockResolvedValue(null)} />,
+      <ServeCard
+        feederId="f1"
+        status={status()}
+        onDone={vi.fn().mockResolvedValue(null)}
+      />,
     );
 
     await userEvent.click(screen.getByRole("button", { name: "Servir agora" }));
@@ -48,7 +52,7 @@ describe("ServeCard", () => {
       screen.getByRole("button", { name: "Servir mesmo assim" }),
     );
 
-    expect(feed).toHaveBeenLastCalledWith(1, true);
+    expect(feed).toHaveBeenLastCalledWith("f1", 1, true);
     expect(await screen.findByText("Porção a caminho.")).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "Servir mesmo assim" }),
@@ -58,7 +62,11 @@ describe("ServeCard", () => {
   it("no limite diário, mostra a mensagem e não oferece forçar", async () => {
     vi.spyOn(api, "feed").mockRejectedValue(new ApiError(429, "limite_diario"));
     render(
-      <ServeCard status={status()} onDone={vi.fn().mockResolvedValue(null)} />,
+      <ServeCard
+        feederId="f1"
+        status={status()}
+        onDone={vi.fn().mockResolvedValue(null)}
+      />,
     );
 
     await userEvent.click(screen.getByRole("button", { name: "Servir agora" }));
@@ -74,6 +82,7 @@ describe("ServeCard", () => {
   it("enquanto o alimentador serve, o botão fica desabilitado", () => {
     render(
       <ServeCard
+        feederId="f1"
         status={status({ estado: "servindo" })}
         onDone={vi.fn().mockResolvedValue(null)}
       />,
@@ -97,7 +106,7 @@ describe("SchedulePage", () => {
 
   it("mostra a agenda salva e a soma das porções contra o limite", async () => {
     mockApi();
-    render(<SchedulePage />);
+    render(<SchedulePage feederId="f1" />);
 
     expect(await screen.findByLabelText("Horário da refeição 1")).toHaveValue(
       "07:30",
@@ -121,7 +130,7 @@ describe("SchedulePage", () => {
           "07:00 e 07:30 estão a 30 min, menos que o intervalo mínimo de 60 min",
         ),
       );
-    render(<SchedulePage />);
+    render(<SchedulePage feederId="f1" />);
 
     await userEvent.click(
       await screen.findByRole("button", { name: "Adicionar refeição" }),
@@ -130,7 +139,7 @@ describe("SchedulePage", () => {
       screen.getByRole("button", { name: "Salvar agenda" }),
     );
 
-    expect(save).toHaveBeenCalledWith([
+    expect(save).toHaveBeenCalledWith("f1", [
       cafe,
       { hora: "07:00", porcoes: 1, ativo: true },
     ]);
@@ -176,7 +185,7 @@ describe("funções de apoio das telas", () => {
     ]);
   });
 
-  it("fromForm aceita vírgula, tira os espaços do nome e aponta o campo que não é número", () => {
+  it("fromForm aceita vírgula e aponta o campo que não é número", () => {
     const form = {
       gramasPorPorcao: "6,5",
       limiteDiarioPorcoes: "10",
@@ -186,13 +195,9 @@ describe("funções de apoio das telas", () => {
       anguloEncher: "0",
       anguloServir: "60",
       fusoHorario: "America/Sao_Paulo",
-      nomeDoGato: " Mingau ",
     };
 
-    expect(fromForm(form)).toMatchObject({
-      gramasPorPorcao: 6.5,
-      nomeDoGato: "Mingau",
-    });
+    expect(fromForm(form)).toMatchObject({ gramasPorPorcao: 6.5 });
     expect(fromForm({ ...form, anguloServir: "abc" })).toEqual({
       invalid: "anguloServir",
     });

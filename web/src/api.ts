@@ -11,14 +11,29 @@ export type Config = {
   alturaGarrafaMm: number;
   anguloEncher: number;
   anguloServir: number;
-  nomeDoGato: string;
 };
 
 export type Alert = { tipo: string; mensagem: string; desde: string };
 
+export type FeederKind = "aparelho" | "simulado";
+
+// Um comedouro na lista da conta.
+export type FeederSummary = {
+  id: string;
+  apelido: string;
+  tipo: FeederKind;
+  criadoEm: string;
+  online: boolean;
+  alertas: number;
+};
+
+// O usuário e a senha MQTT de um aparelho novo: o servidor mostra uma vez só.
+export type DeviceCredential = { usuario: string; senha: string };
+
 export type Status = {
   hora: string;
-  nomeDoGato: string;
+  apelido: string;
+  tipo: FeederKind;
   online: boolean;
   onlineDesde: string | null;
   estado: "ocioso" | "servindo" | "vazio" | null;
@@ -122,6 +137,8 @@ async function request<T>(
   return data as T;
 }
 
+const feeder = (id: string) => `/comedouros/${encodeURIComponent(id)}`;
+
 export const api = {
   loginOptions: () => request<LoginOptions>("GET", "/sessao/opcoes"),
   loginGoogle: (credencial: string) =>
@@ -130,43 +147,75 @@ export const api = {
   logout: () => request<null>("DELETE", "/sessao"),
   me: () => request<User>("GET", "/eu"),
 
-  status: () => request<Status>("GET", "/status"),
-  feed: (porcoes: number, forcar = false) =>
-    request<unknown>("POST", "/feed", { porcoes, forcar }),
+  // Os comedouros da conta.
+  feeders: () =>
+    request<{ aparelhoDisponivel: boolean; comedouros: FeederSummary[] }>(
+      "GET",
+      "/comedouros",
+    ),
+  createFeeder: (apelido: string, tipo: FeederKind) =>
+    request<{ comedouro: FeederSummary; credencial: DeviceCredential | null }>(
+      "POST",
+      "/comedouros",
+      { apelido, tipo },
+    ),
+  renameFeeder: (id: string, apelido: string) =>
+    request<FeederSummary>("PATCH", feeder(id), { apelido }),
+  removeFeeder: (id: string) => request<null>("DELETE", feeder(id)),
 
-  schedules: () =>
-    request<{ versao: number; agenda: ScheduleItem[] }>("GET", "/schedules"),
-  saveSchedules: (agenda: ScheduleItem[]) =>
+  // Um comedouro.
+  status: (id: string) => request<Status>("GET", `${feeder(id)}/status`),
+  feed: (id: string, porcoes: number, forcar = false) =>
+    request<unknown>("POST", `${feeder(id)}/feed`, { porcoes, forcar }),
+
+  schedules: (id: string) =>
+    request<{ versao: number; agenda: ScheduleItem[] }>(
+      "GET",
+      `${feeder(id)}/schedules`,
+    ),
+  saveSchedules: (id: string, agenda: ScheduleItem[]) =>
     request<{ versao: number; agenda: ScheduleItem[] }>(
       "PUT",
-      "/schedules",
+      `${feeder(id)}/schedules`,
       agenda,
     ),
 
-  config: () =>
+  config: (id: string) =>
     request<{ versao: number; config: Config; fusos: string[] }>(
       "GET",
-      "/config",
+      `${feeder(id)}/config`,
     ),
-  saveConfig: (config: Config) =>
+  saveConfig: (id: string, config: Config) =>
     request<{ versao: number; config: Config; fusos: string[] }>(
       "PUT",
-      "/config",
+      `${feeder(id)}/config`,
       config,
     ),
 
-  history: (limit: number) =>
-    request<HistoryItem[]>("GET", `/history?limit=${limit}`),
+  history: (id: string, limit: number) =>
+    request<HistoryItem[]>("GET", `${feeder(id)}/history?limit=${limit}`),
 
-  acknowledgeAlerts: () => request<unknown>("POST", "/alerts/ack"),
-  tare: () => request<unknown>("POST", "/scale/tare"),
-  calibrateScale: (gramas: number) =>
-    request<unknown>("POST", "/scale/calibrate", { gramas }),
-  calibrateDose: (porcoes: number) =>
-    request<unknown>("POST", "/calibrate", { porcoes }),
-  testServo: (angulo: number) =>
-    request<unknown>("POST", "/servo/test", { angulo }),
+  acknowledgeAlerts: (id: string) =>
+    request<unknown>("POST", `${feeder(id)}/alerts/ack`),
+  tare: (id: string) => request<unknown>("POST", `${feeder(id)}/scale/tare`),
+  calibrateScale: (id: string, gramas: number) =>
+    request<unknown>("POST", `${feeder(id)}/scale/calibrate`, { gramas }),
+  calibrateDose: (id: string, porcoes: number) =>
+    request<unknown>("POST", `${feeder(id)}/calibrate`, { porcoes }),
+  testServo: (id: string, angulo: number) =>
+    request<unknown>("POST", `${feeder(id)}/servo/test`, { angulo }),
 
+  simulate: (
+    id: string,
+    changes: {
+      tigelaGramas?: number;
+      garrafaGramas?: number;
+      balanca?: boolean;
+      nivel?: boolean;
+    },
+  ) => request<unknown>("POST", `${feeder(id)}/simulador`, changes),
+
+  // Notificações: são da conta, não de um comedouro.
   pushPublicKey: () =>
     request<{ chave: string | null }>("GET", "/push/public-key"),
   pushSubscribe: (subscription: PushSubscriptionJSON) =>
@@ -174,11 +223,4 @@ export const api = {
   pushUnsubscribe: (endpoint: string) =>
     request<unknown>("POST", "/push/unsubscribe", { endpoint }),
   pushTest: () => request<unknown>("POST", "/push/test"),
-
-  simulate: (changes: {
-    tigelaGramas?: number;
-    garrafaGramas?: number;
-    balanca?: boolean;
-    nivel?: boolean;
-  }) => request<unknown>("POST", "/simulador", changes),
 };

@@ -23,7 +23,13 @@ const MOTIVOS: Record<string, string> = {
   limite_tigela_invalido: "Limite da tigela: de 0 a 100 g.",
   fuso_invalido: "Fuso horário desconhecido.",
   altura_garrafa_invalida: "Altura da garrafa: de 50 a 500 mm.",
-  nome_do_gato_invalido: "O nome aceita até 30 letras.",
+  // comedouros da conta
+  apelido_invalido: "O apelido precisa ter de 1 a 30 letras.",
+  limite_de_comedouros: "Cada conta tem no máximo 10 comedouros.",
+  limite_de_simulados: "Cada conta tem só um comedouro simulado.",
+  aparelho_indisponivel:
+    "Este servidor ainda não aceita aparelhos: falta ligar o broker MQTT.",
+  nao_encontrado: "Este comedouro não existe mais, ou é de outra conta.",
   angulos_invalidos:
     "Os ângulos vão de 0° a 180° e precisam ser diferentes entre si.",
   conflito_de_versao:
@@ -70,7 +76,7 @@ export function toneFor(error: unknown): "warn" | "bad" {
 }
 
 const CAMPOS: Record<string, string> = {
-  nome_do_gato_invalido: "nomeDoGato",
+  apelido_invalido: "apelido",
   gramas_por_porcao_invalido: "gramasPorPorcao",
   limite_diario_invalido: "limiteDiarioPorcoes",
   agenda_acima_do_limite: "limiteDiarioPorcoes",
@@ -106,7 +112,7 @@ function dayAndTime(iso: string, now: Date): { day: string; time: string } {
 // A frase de situação: o topo da tela inicial responde "está tudo bem?" (guia de UI/UX, seção 6).
 // Quando existe um problema, a frase começa por ele.
 export function situation(status: Status, now: Date = new Date()): string {
-  const nome = status.nomeDoGato.trim() || "Seu gato";
+  const nome = status.apelido.trim() || "O comedouro";
   const frases: string[] = [];
   const parado = status.estado === "vazio";
 
@@ -135,7 +141,7 @@ export function situation(status: Status, now: Date = new Date()): string {
         : day === "ontem"
           ? `ontem às ${time}`
           : `em ${day}, às ${time}`;
-    frases.push(`${nome} comeu ${quando}.`);
+    frases.push(`${nome} serviu ${quando}.`);
   } else if (frases.length === 0) {
     frases.push("Nenhuma refeição registrada ainda.");
   }

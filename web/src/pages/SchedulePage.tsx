@@ -16,9 +16,9 @@ export function freeTime(agenda: ScheduleItem[]): string {
   return "00:00";
 }
 
-export function SchedulePage() {
-  const saved = useLoad(api.schedules);
-  const config = useLoad(api.config);
+export function SchedulePage(props: { feederId: string }) {
+  const saved = useLoad(() => api.schedules(props.feederId));
+  const config = useLoad(() => api.config(props.feederId));
   const [items, setItems] = useState<ScheduleItem[]>([]);
   const [dirty, setDirty] = useState(false);
   const action = useAction();
@@ -48,7 +48,7 @@ export function SchedulePage() {
   const save = async () => {
     const ok = await action.run(
       async () => {
-        const result = await api.saveSchedules(items);
+        const result = await api.saveSchedules(props.feederId, items);
         setItems(result.agenda);
       },
       {

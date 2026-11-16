@@ -9,7 +9,7 @@ const at = (day: number, hour: number, minute: number) =>
 
 const status = (changes: Partial<Status> = {}): Status =>
   ({
-    nomeDoGato: "Mingau",
+    apelido: "Cozinha",
     online: true,
     onlineDesde: at(10, 8, 0),
     estado: "ocioso",
@@ -24,15 +24,15 @@ const status = (changes: Partial<Status> = {}): Status =>
   }) as Status;
 
 describe("situation: a frase do topo da tela inicial", () => {
-  it("com tudo bem, diz quando o gato comeu e quando é a próxima refeição", () => {
+  it("com tudo bem, diz quando o comedouro serviu e quando é a próxima refeição", () => {
     expect(situation(status(), now)).toBe(
-      "Mingau comeu às 12:30. Próxima refeição às 18:00.",
+      "Cozinha serviu às 12:30. Próxima refeição às 18:00.",
     );
   });
 
-  it("sem nome configurado, fala em 'Seu gato'", () => {
-    expect(situation(status({ nomeDoGato: "  " }), now)).toBe(
-      "Seu gato comeu às 12:30. Próxima refeição às 18:00.",
+  it("sem apelido, fala em 'O comedouro'", () => {
+    expect(situation(status({ apelido: "  " }), now)).toBe(
+      "O comedouro serviu às 12:30. Próxima refeição às 18:00.",
     );
   });
 
@@ -51,7 +51,7 @@ describe("situation: a frase do topo da tela inicial", () => {
     );
 
     expect(text).toBe(
-      "Mingau comeu ontem às 18:00. Próxima refeição amanhã às 07:30.",
+      "Cozinha serviu ontem às 18:00. Próxima refeição amanhã às 07:30.",
     );
   });
 
@@ -68,7 +68,7 @@ describe("situation: a frase do topo da tela inicial", () => {
       now,
     );
 
-    expect(text).toContain("Mingau comeu em 05/11, às 18:00.");
+    expect(text).toContain("Cozinha serviu em 05/11, às 18:00.");
   });
 
   it("sem nenhuma refeição e sem agenda, diz as duas coisas", () => {
@@ -86,7 +86,7 @@ describe("situation: a frase do topo da tela inicial", () => {
     );
 
     expect(text).toBe(
-      "Sem contato com o comedouro desde as 13:20. Mingau comeu às 12:30.",
+      "Sem contato com o comedouro desde as 13:20. Cozinha serviu às 12:30.",
     );
   });
 
@@ -104,7 +104,7 @@ describe("situation: a frase do topo da tela inicial", () => {
 
   it("com a porção que não saiu, a frase começa pelo problema", () => {
     expect(situation(status({ estado: "vazio" }), now)).toBe(
-      "A última porção não saiu. Mingau comeu às 12:30.",
+      "A última porção não saiu. Cozinha serviu às 12:30.",
     );
   });
 });
@@ -129,9 +129,7 @@ describe("toneFor: recusa é aviso, falha é problema", () => {
 
 describe("fieldFor: o campo dos Ajustes que causou o erro", () => {
   it("leva cada regra ao campo certo", () => {
-    expect(fieldFor(new ApiError(422, "nome_do_gato_invalido"))).toBe(
-      "nomeDoGato",
-    );
+    expect(fieldFor(new ApiError(422, "apelido_invalido"))).toBe("apelido");
     expect(fieldFor(new ApiError(422, "agenda_acima_do_limite"))).toBe(
       "limiteDiarioPorcoes",
     );

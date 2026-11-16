@@ -1,27 +1,15 @@
 import { useEffect, useState } from "react";
 import type { User } from "./api";
 import { messageFor } from "./messages";
+import { FeedersPage } from "./pages/FeedersPage";
 import { HistoryPage } from "./pages/HistoryPage";
 import { HomePage } from "./pages/HomePage";
 import { LoginPage } from "./pages/LoginPage";
 import { SchedulePage } from "./pages/SchedulePage";
 import { SettingsPage } from "./pages/SettingsPage";
+import { feederPath, navigate, type Route, TABS, useRoute } from "./router";
 import { useSession } from "./session";
 import { Icon, LoadError, Loading, Notice } from "./ui";
-
-const TABS = [
-  { id: "inicio", label: "Início" },
-  { id: "agenda", label: "Agenda" },
-  { id: "historico", label: "Histórico" },
-  { id: "ajustes", label: "Ajustes" },
-] as const;
-
-type TabId = (typeof TABS)[number]["id"];
-
-function tabFromHash(): TabId {
-  const id = window.location.hash.replace("#", "");
-  return TABS.some((t) => t.id === id) ? (id as TabId) : "inicio";
-}
 
 // Avisa quando o próprio aparelho fica sem rede: o app continua abrindo, mas não dá para comandar nada.
 function useOnline(): boolean {
@@ -61,33 +49,35 @@ export function App() {
 }
 
 function SignedInApp(props: { user: User }) {
-  const [tab, setTab] = useState<TabId>(tabFromHash);
+  const route = useRoute();
   const online = useOnline();
 
-  useEffect(() => {
-    const onHash = () => setTab(tabFromHash());
-    window.addEventListener("hashchange", onHash);
-    return () => window.removeEventListener("hashchange", onHash);
-  }, []);
+  const offline = !online && (
+    <Notice tone="bad" title="Sem conexão">
+      Os dados podem estar desatualizados.
+    </Notice>
+  );
 
-  const go = (id: TabId) => {
-    window.location.hash = id;
-    setTab(id);
-    window.scrollTo(0, 0);
-  };
+  if (route.name === "comedouros") {
+    return (
+      <div className="app">
+        <main className="page page-no-tabs">
+          {offline}
+          <FeedersPage user={props.user} />
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="app">
       <main className="page">
-        {!online && (
-          <Notice tone="bad" title="Sem conexão">
-            Os dados podem estar desatualizados.
-          </Notice>
-        )}
-        {tab === "inicio" && <HomePage />}
-        {tab === "agenda" && <SchedulePage />}
-        {tab === "historico" && <HistoryPage />}
-        {tab === "ajustes" && <SettingsPage user={props.user} />}
+        <button type="button" className="back" onClick={() => navigate("/")}>
+          <Icon name="voltar" />
+          Comedouros
+        </button>
+        {offline}
+        <FeederScreen route={route} />
       </main>
 
       <nav className="tabs" aria-label="Seções">
@@ -95,9 +85,9 @@ function SignedInApp(props: { user: User }) {
           <button
             key={t.id}
             type="button"
-            className={t.id === tab ? "tab tab-active" : "tab"}
-            aria-current={t.id === tab ? "page" : undefined}
-            onClick={() => go(t.id)}
+            className={t.id === route.tab ? "tab tab-active" : "tab"}
+            aria-current={t.id === route.tab ? "page" : undefined}
+            onClick={() => navigate(feederPath(route.id, t.id))}
           >
             <Icon name={t.id} />
             {t.label}
@@ -106,4 +96,13 @@ function SignedInApp(props: { user: User }) {
       </nav>
     </div>
   );
+}
+
+// `key` com o id: trocar de comedouro recomeça a tela, sem mostrar dados do anterior.
+function FeederScreen(props: { route: Extract<Route, { name: "comedouro" }> }) {
+  const { id, tab } = props.route;
+  if (tab === "agenda") return <SchedulePage key={id} feederId={id} />;
+  if (tab === "historico") return <HistoryPage key={id} feederId={id} />;
+  if (tab === "ajustes") return <SettingsPage key={id} feederId={id} />;
+  return <HomePage key={id} feederId={id} />;
 }

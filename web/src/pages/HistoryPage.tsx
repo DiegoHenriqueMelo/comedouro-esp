@@ -19,9 +19,9 @@ export function groupByDay(
   return groups;
 }
 
-export function HistoryPage() {
+export function HistoryPage(props: { feederId: string }) {
   const [limit, setLimit] = useState(50);
-  const history = useLoad(() => api.history(limit), 10_000);
+  const history = useLoad(() => api.history(props.feederId, limit), 10_000);
 
   if (history.loading) return <Loading />;
   if (!history.data) {

@@ -1,19 +1,19 @@
 import { useEffect, useState } from "react";
-import { api, type Config, type User } from "../api";
+import { api, type Config } from "../api";
 import { useAction, useLoad } from "../hooks";
 import { fieldFor, messageFor } from "../messages";
-import { disablePush, enablePush, getPushState, type PushState } from "../push";
-import { signOut } from "../session";
+import { navigate } from "../router";
 import {
   Card,
   FeedbackLine,
   Field,
   LoadError,
   Loading,
+  Notice,
   parseNumber,
 } from "../ui";
 
-type NumericKey = Exclude<keyof Config, "fusoHorario" | "nomeDoGato">;
+type NumericKey = Exclude<keyof Config, "fusoHorario">;
 
 const FIELDS: { key: NumericKey; label: string; hint: string }[] = [
   {
@@ -53,16 +53,10 @@ const FIELDS: { key: NumericKey; label: string; hint: string }[] = [
   },
 ];
 
-type Form = Record<NumericKey, string> & {
-  fusoHorario: string;
-  nomeDoGato: string;
-};
+type Form = Record<NumericKey, string> & { fusoHorario: string };
 
 function toForm(config: Config): Form {
-  const form = {
-    fusoHorario: config.fusoHorario,
-    nomeDoGato: config.nomeDoGato,
-  } as Form;
+  const form = { fusoHorario: config.fusoHorario } as Form;
   for (const { key } of FIELDS) {
     form[key] = String(config[key]).replace(".", ",");
   }
@@ -71,10 +65,7 @@ function toForm(config: Config): Form {
 
 // Devolve o nome do primeiro campo que não é número, ou a configuração pronta.
 export function fromForm(form: Form): Config | { invalid: NumericKey } {
-  const config = {
-    fusoHorario: form.fusoHorario,
-    nomeDoGato: form.nomeDoGato.trim(),
-  } as Config;
+  const config = { fusoHorario: form.fusoHorario } as Config;
   for (const { key } of FIELDS) {
     const value = parseNumber(form[key]);
     if (Number.isNaN(value)) return { invalid: key };
@@ -83,9 +74,9 @@ export function fromForm(form: Form): Config | { invalid: NumericKey } {
   return config;
 }
 
-export function SettingsPage(props: { user?: User }) {
-  const saved = useLoad(api.config);
-  const status = useLoad(api.status, 5000);
+export function SettingsPage(props: { feederId: string }) {
+  const saved = useLoad(() => api.config(props.feederId));
+  const status = useLoad(() => api.status(props.feederId), 5000);
   const [form, setForm] = useState<Form | null>(null);
   const [dirty, setDirty] = useState(false);
   // O erro fica embaixo do campo que o causou (guia de UI/UX, seção 5.7).
@@ -130,7 +121,7 @@ export function SettingsPage(props: { user?: User }) {
     const ok = await action.run(
       async () => {
         try {
-          await api.saveConfig(config);
+          await api.saveConfig(props.feederId, config);
         } catch (err) {
           failure = err;
           throw err;
@@ -170,22 +161,14 @@ export function SettingsPage(props: { user?: User }) {
         <h1>Ajustes</h1>
       </header>
 
-      <Card title="Seu gato">
-        <Field
-          label="Nome"
-          hint="O app usa o nome nas frases: “Mingau comeu às 12:30.”"
-          error={errorOf("nomeDoGato")}
-        >
-          <input
-            className="input"
-            autoComplete="off"
-            maxLength={30}
-            aria-invalid={errorOf("nomeDoGato") !== null}
-            value={form.nomeDoGato}
-            onChange={(e) => set("nomeDoGato", e.target.value)}
-          />
-        </Field>
-      </Card>
+      {status.data && (
+        <Nickname
+          key={status.data.apelido}
+          feederId={props.feederId}
+          apelido={status.data.apelido}
+          onDone={status.reload}
+        />
+      )}
 
       <Card title="Alimentação">
         {FIELDS.slice(0, 4).map(numberField)}
@@ -220,10 +203,11 @@ export function SettingsPage(props: { user?: User }) {
         {action.busy ? "Salvando…" : "Salvar ajustes"}
       </button>
 
-      <Maintenance form={form} />
-      <Notifications />
-      {status.data?.simulado && <Simulator onDone={status.reload} />}
-      {props.user && <Account user={props.user} />}
+      <Maintenance feederId={props.feederId} form={form} />
+      {status.data?.simulado && (
+        <Simulator feederId={props.feederId} onDone={status.reload} />
+      )}
+      <RemoveFeeder feederId={props.feederId} />
 
       <p className="legend center">
         Configuração na versão {saved.data.versao}
@@ -237,7 +221,7 @@ export function SettingsPage(props: { user?: User }) {
 }
 
 // Comandos que mexem no aparelho: só funcionam com ele online e parado.
-function Maintenance(props: { form: Form }) {
+function Maintenance(props: { feederId: string; form: Form }) {
   const action = useAction();
   const [peso, setPeso] = useState("500");
   const [porcoes, setPorcoes] = useState("20");
@@ -265,7 +249,7 @@ function Maintenance(props: { form: Form }) {
           type="button"
           className="button"
           disabled={action.busy}
-          onClick={() => run(api.tare, "Balança zerada.")}
+          onClick={() => run(() => api.tare(props.feederId), "Balança zerada.")}
         >
           Tarar a balança
         </button>
@@ -281,7 +265,9 @@ function Maintenance(props: { form: Form }) {
           type="button"
           className="button"
           disabled={action.busy}
-          onClick={() => number(peso, api.calibrateScale)}
+          onClick={() =>
+            number(peso, (g) => api.calibrateScale(props.feederId, g))
+          }
         >
           Calibrar a balança
         </button>
@@ -305,7 +291,9 @@ function Maintenance(props: { form: Form }) {
           type="button"
           className="button"
           disabled={action.busy}
-          onClick={() => number(porcoes, api.calibrateDose)}
+          onClick={() =>
+            number(porcoes, (p) => api.calibrateDose(props.feederId, p))
+          }
         >
           Soltar porções para pesar
         </button>
@@ -321,7 +309,11 @@ function Maintenance(props: { form: Form }) {
             type="button"
             className="button"
             disabled={action.busy}
-            onClick={() => number(props.form.anguloEncher, api.testServo)}
+            onClick={() =>
+              number(props.form.anguloEncher, (a) =>
+                api.testServo(props.feederId, a),
+              )
+            }
           >
             Testar ângulo de encher
           </button>
@@ -329,7 +321,11 @@ function Maintenance(props: { form: Form }) {
             type="button"
             className="button"
             disabled={action.busy}
-            onClick={() => number(props.form.anguloServir, api.testServo)}
+            onClick={() =>
+              number(props.form.anguloServir, (a) =>
+                api.testServo(props.feederId, a),
+              )
+            }
           >
             Testar ângulo de servir
           </button>
@@ -340,119 +336,15 @@ function Maintenance(props: { form: Form }) {
   );
 }
 
-const PUSH_TEXT: Record<PushState, string> = {
-  sem_suporte:
-    "Este navegador não recebe notificações. No iPhone, instale o app na tela inicial antes. O endereço também precisa ser HTTPS.",
-  servidor_desligado:
-    "O servidor está sem as chaves de notificação. Veja o guia de configuração.",
-  bloqueado:
-    "As notificações estão bloqueadas para este site. Libere nas configurações do navegador.",
-  desativado: "As notificações estão desativadas neste aparelho.",
-  ativado: "Este aparelho recebe os avisos do comedouro.",
-};
-
-export function Account(props: { user: User }) {
-  const action = useAction();
-
-  return (
-    <Card title="Sua conta">
-      <div className="account">
-        {props.user.foto && (
-          <img
-            className="account-photo"
-            src={props.user.foto}
-            alt=""
-            referrerPolicy="no-referrer"
-          />
-        )}
-        <div className="list-text">
-          <span>{props.user.nome}</span>
-          <span className="legend">{props.user.email}</span>
-        </div>
-      </div>
-      <FeedbackLine feedback={action.feedback} />
-      <button
-        type="button"
-        className="button"
-        disabled={action.busy}
-        onClick={() =>
-          void action.run(signOut, { ok: "Você saiu.", error: messageFor })
-        }
-      >
-        {action.busy ? "Saindo…" : "Sair"}
-      </button>
-    </Card>
-  );
-}
-
-function Notifications() {
-  const [state, setState] = useState<PushState | null>(null);
-  const action = useAction();
-
-  useEffect(() => {
-    getPushState()
-      .then(setState)
-      .catch(() => setState("sem_suporte"));
-  }, []);
-
-  const change = (work: () => Promise<PushState>, ok: string) =>
-    void action.run(async () => setState(await work()), {
-      ok,
-      error: (err) => messageFor(err),
-    });
-
-  return (
-    <Card title="Notificações">
-      <p className="legend">{state ? PUSH_TEXT[state] : "Verificando…"}</p>
-      {state === "desativado" && (
-        <button
-          type="button"
-          className="button"
-          disabled={action.busy}
-          onClick={() => change(enablePush, "Notificações ativadas.")}
-        >
-          Ativar neste aparelho
-        </button>
-      )}
-      {state === "ativado" && (
-        <div className="inline">
-          <button
-            type="button"
-            className="button"
-            disabled={action.busy}
-            onClick={() =>
-              void action.run(api.pushTest, {
-                ok: "Teste enviado: a notificação chega em instantes.",
-                error: (err) => messageFor(err),
-              })
-            }
-          >
-            Enviar um teste
-          </button>
-          <button
-            type="button"
-            className="button button-quiet"
-            disabled={action.busy}
-            onClick={() => change(disablePush, "Notificações desativadas.")}
-          >
-            Desativar
-          </button>
-        </div>
-      )}
-      <FeedbackLine feedback={action.feedback} />
-    </Card>
-  );
-}
-
-// Só aparece quando o servidor roda sem ESP32: mexe no "mundo físico" de mentira.
-function Simulator(props: { onDone: () => Promise<void> }) {
+// Só aparece nos comedouros simulados: mexe no "mundo físico" de mentira.
+function Simulator(props: { feederId: string; onDone: () => Promise<void> }) {
   const action = useAction();
   const [tigela, setTigela] = useState("30");
   const [garrafa, setGarrafa] = useState("100");
 
-  const send = (changes: Parameters<typeof api.simulate>[0]) =>
+  const send = (changes: Parameters<typeof api.simulate>[1]) =>
     void action
-      .run(() => api.simulate(changes), {
+      .run(() => api.simulate(props.feederId, changes), {
         ok: "Simulação atualizada.",
         error: (err) => messageFor(err),
       })
@@ -470,8 +362,8 @@ function Simulator(props: { onDone: () => Promise<void> }) {
   return (
     <Card title="Simulador">
       <p className="legend">
-        O servidor está rodando sem a placa. Use isto para ver as recusas e os
-        avisos acontecerem.
+        Este comedouro é simulado: roda dentro do servidor, sem placa. Use isto
+        para ver as recusas e os avisos acontecerem.
       </p>
       <div className="section stack">
         <Field label="Ração na tigela, em gramas">
@@ -529,5 +421,130 @@ function Simulator(props: { onDone: () => Promise<void> }) {
       </div>
       <FeedbackLine feedback={action.feedback} />
     </Card>
+  );
+}
+
+// O apelido aparece no título e nas frases: “Cozinha serviu às 12:30.”
+function Nickname(props: {
+  feederId: string;
+  apelido: string;
+  onDone: () => Promise<void>;
+}) {
+  const [apelido, setApelido] = useState(props.apelido);
+  const [error, setError] = useState<string | null>(null);
+  const action = useAction();
+  const changed = apelido.trim() !== props.apelido;
+
+  const save = async () => {
+    setError(null);
+    let failure: unknown = null;
+    const ok = await action.run(
+      async () => {
+        try {
+          await api.renameFeeder(props.feederId, apelido);
+        } catch (err) {
+          failure = err;
+          throw err;
+        }
+      },
+      { ok: "Apelido salvo.", error: (err) => messageFor(err) },
+    );
+    if (ok) {
+      await props.onDone();
+    } else if (fieldFor(failure) === "apelido") {
+      setError(messageFor(failure));
+      action.setFeedback(null);
+    }
+  };
+
+  return (
+    <Card title="Comedouro">
+      <Field
+        label="Apelido"
+        hint="Aparece no título e nas frases: “Cozinha serviu às 12:30.”"
+        error={error}
+      >
+        <input
+          className="input"
+          autoComplete="off"
+          maxLength={30}
+          aria-invalid={error !== null}
+          value={apelido}
+          onChange={(e) => {
+            setApelido(e.target.value);
+            setError(null);
+            action.setFeedback(null);
+          }}
+        />
+      </Field>
+      <FeedbackLine feedback={action.feedback} />
+      <button
+        type="button"
+        className="button"
+        disabled={!changed || action.busy}
+        onClick={() => void save()}
+      >
+        {action.busy ? "Salvando…" : "Salvar apelido"}
+      </button>
+    </Card>
+  );
+}
+
+// Remover pede uma confirmação: apaga a agenda, o histórico e a senha do aparelho.
+export function RemoveFeeder(props: { feederId: string }) {
+  const [confirming, setConfirming] = useState(false);
+  const action = useAction();
+
+  const remove = async () => {
+    const ok = await action.run(() => api.removeFeeder(props.feederId), {
+      ok: "Comedouro removido.",
+      error: (err) => messageFor(err),
+    });
+    if (ok) navigate("/");
+  };
+
+  if (!confirming) {
+    return (
+      <button
+        type="button"
+        className="button button-quiet"
+        onClick={() => setConfirming(true)}
+      >
+        Remover este comedouro
+      </button>
+    );
+  }
+
+  return (
+    <>
+      <Notice
+        tone="warn"
+        title="Remover este comedouro?"
+        action={
+          <div className="inline">
+            <button
+              type="button"
+              className="button"
+              disabled={action.busy}
+              onClick={() => void remove()}
+            >
+              {action.busy ? "Removendo…" : "Remover de vez"}
+            </button>
+            <button
+              type="button"
+              className="button button-quiet"
+              disabled={action.busy}
+              onClick={() => setConfirming(false)}
+            >
+              Cancelar
+            </button>
+          </div>
+        }
+      >
+        A agenda, os ajustes e o histórico são apagados. Se for um aparelho, ele
+        deixa de conectar e precisa ser cadastrado de novo.
+      </Notice>
+      <FeedbackLine feedback={action.feedback} />
+    </>
   );
 }

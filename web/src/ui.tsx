@@ -173,6 +173,8 @@ const ICONS = {
       <circle cx="9" cy="16" r="2.5" />
     </>
   ),
+  voltar: <path d="M14.5 6 8.5 12l6 6" />,
+  seguir: <path d="M9.5 6l6 6-6 6" />,
 } as const;
 
 export type IconName = keyof typeof ICONS;

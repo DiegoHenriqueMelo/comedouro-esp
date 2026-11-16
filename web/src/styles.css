@@ -523,6 +523,123 @@ select {
   height: 24px;
 }
 
+/* Telas sem a barra de abas (a lista de comedouros) não precisam do espaço dela embaixo. */
+.page-no-tabs {
+  padding-bottom: calc(var(--e6) + env(safe-area-inset-bottom));
+}
+
+/* "‹ Comedouros": volta para a lista. Discreto, acima do título. */
+.back {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: var(--e1);
+  min-height: 44px;
+  margin: calc(-1 * var(--e3)) 0 calc(-1 * var(--e2)) calc(-1 * var(--e2));
+  padding: 0 var(--e2);
+  border: 0;
+  border-radius: var(--canto-controle);
+  background: transparent;
+  color: var(--tinta-suave);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.back .icon {
+  width: 20px;
+  height: 20px;
+}
+
+/* Um comedouro na lista: a linha inteira é o botão. */
+.feeder-item {
+  display: flex;
+  align-items: center;
+  gap: var(--e3);
+  width: 100%;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.feeder-item > .icon {
+  flex: none;
+  color: var(--tinta-suave);
+}
+
+.feeder-name {
+  font-weight: 600;
+}
+
+.list-item:has(.feeder-item) {
+  align-items: center;
+}
+
+/* Escolha entre opções (rádio), com o rótulo e a legenda ao lado. */
+.choices {
+  display: flex;
+  flex-direction: column;
+  gap: var(--e2);
+  margin: var(--e2) 0 0;
+  padding: 0;
+  border: 0;
+}
+
+.choices legend {
+  margin-bottom: var(--e1);
+  padding: 0;
+}
+
+.choice {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--e3);
+  min-height: 44px;
+  padding: var(--e3);
+  border: 1px solid var(--linha);
+  border-radius: var(--canto-controle);
+  cursor: pointer;
+}
+
+.choice:has(input:checked) {
+  border-color: var(--terracota);
+}
+
+.choice input {
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  accent-color: var(--terracota);
+}
+
+.choice-off {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* O usuário e a senha de um aparelho novo. */
+.credential {
+  display: flex;
+  flex-direction: column;
+  gap: var(--e1);
+  margin-top: var(--e2);
+}
+
+code {
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.back:focus-visible,
+.feeder-item:focus-visible,
+.choice input:focus-visible {
+  outline: 2px solid var(--terracota);
+  outline-offset: 2px;
+}
+
 /* Tela de login: a única antes da sessão. Sem barra de abas, centrada na largura. */
 .login {
   justify-content: center;
