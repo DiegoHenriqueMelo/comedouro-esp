@@ -15,6 +15,9 @@ export async function resizePhoto(file: File): Promise<Blob> {
   canvas.height = height;
   const context = canvas.getContext("2d");
   if (!context) throw new Error("sem canvas");
+  // O JPEG não tem transparência: sem um fundo, o que é transparente (um PNG recortado) vira preto.
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, width, height);
   context.drawImage(bitmap, 0, 0, width, height);
   bitmap.close();
 
