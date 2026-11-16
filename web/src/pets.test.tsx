@@ -180,9 +180,7 @@ describe("PetForm", () => {
       screen.getByRole("button", { name: "Remover Mingau" }),
     );
     expect(remove).not.toHaveBeenCalled();
-    await userEvent.click(
-      screen.getByRole("button", { name: "Remover de vez" }),
-    );
+    await userEvent.click(screen.getByRole("button", { name: "Remover" }));
 
     expect(remove).toHaveBeenCalledWith("p1");
     expect(window.location.pathname).toBe("/");

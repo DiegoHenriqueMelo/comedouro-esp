@@ -6,12 +6,12 @@ import { resizePhoto } from "../photo";
 import { navigate } from "../router";
 import {
   Card,
+  ConfirmDialog,
   FeedbackLine,
   Field,
   Icon,
   LoadError,
   Loading,
-  Notice,
   parseNumber,
 } from "../ui";
 
@@ -293,8 +293,8 @@ function RemovePet(props: { id: string; nome: string }) {
     if (ok) navigate("/");
   };
 
-  if (!confirming) {
-    return (
+  return (
+    <>
       <button
         type="button"
         className="button button-quiet"
@@ -302,38 +302,22 @@ function RemovePet(props: { id: string; nome: string }) {
       >
         Remover {props.nome}
       </button>
-    );
-  }
-
-  return (
-    <>
-      <Notice
-        tone="warn"
-        title={`Remover ${props.nome}?`}
-        action={
-          <div className="inline">
-            <button
-              type="button"
-              className="button"
-              disabled={action.busy}
-              onClick={() => void remove()}
-            >
-              {action.busy ? "Removendo…" : "Remover de vez"}
-            </button>
-            <button
-              type="button"
-              className="button button-quiet"
-              disabled={action.busy}
-              onClick={() => setConfirming(false)}
-            >
-              Cancelar
-            </button>
-          </div>
-        }
-      >
-        O cadastro e a foto são apagados.
-      </Notice>
-      <FeedbackLine feedback={action.feedback} />
+      {confirming && (
+        <ConfirmDialog
+          title={`Remover ${props.nome}?`}
+          confirmLabel="Remover"
+          busyLabel="Removendo…"
+          busy={action.busy}
+          feedback={action.feedback}
+          onConfirm={() => void remove()}
+          onCancel={() => {
+            setConfirming(false);
+            action.setFeedback(null);
+          }}
+        >
+          O cadastro e a foto são apagados.
+        </ConfirmDialog>
+      )}
     </>
   );
 }

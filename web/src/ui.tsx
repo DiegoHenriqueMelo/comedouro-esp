@@ -1,4 +1,5 @@
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect, useId, useRef } from "react";
+import { createPortal } from "react-dom";
 import type { Feedback, Tone } from "./hooks";
 
 // As peças de interface do guia de UI/UX (docs/UI-UX.md, seção 5). Toda tela é montada com elas.
@@ -49,6 +50,80 @@ export function Notice(props: {
 export function FeedbackLine(props: { feedback: Feedback }) {
   if (!props.feedback) return null;
   return <Notice tone={props.feedback.tone}>{props.feedback.text}</Notice>;
+}
+
+// 5.13 Confirmação: uma janela no centro, por cima da tela, para ações que não têm volta.
+// Fecha com "Cancelar", com a tecla Esc ou tocando fora dela.
+export function ConfirmDialog(props: {
+  title: string;
+  children: ReactNode;
+  confirmLabel: string;
+  busyLabel: string;
+  busy: boolean;
+  feedback: Feedback;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  const titleId = useId();
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  const { busy, onCancel } = props;
+
+  // O foco vai para "Cancelar": um Enter sem querer não apaga nada.
+  useEffect(() => {
+    cancelRef.current?.focus();
+  }, []);
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !busy) onCancel();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [busy, onCancel]);
+
+  return createPortal(
+    // biome-ignore lint/a11y/noStaticElementInteractions: tocar fora é um atalho de mouse; no teclado, o Esc faz o mesmo
+    // biome-ignore lint/a11y/useKeyWithClickEvents: o Esc é tratado no documento inteiro, logo acima
+    <div
+      className="dialog-backdrop"
+      onClick={(event) => {
+        if (event.target === event.currentTarget && !busy) onCancel();
+      }}
+    >
+      <div
+        className="dialog"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+      >
+        <h2 id={titleId} className="dialog-title">
+          {props.title}
+        </h2>
+        <p>{props.children}</p>
+        <FeedbackLine feedback={props.feedback} />
+        <div className="dialog-actions">
+          <button
+            ref={cancelRef}
+            type="button"
+            className="button"
+            disabled={busy}
+            onClick={onCancel}
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            className="button button-primary"
+            disabled={busy}
+            onClick={props.onConfirm}
+          >
+            {busy ? props.busyLabel : props.confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
 }
 
 // 5.9 A barra de um indicador. Ela não muda de cor: quem avisa é a linha de estado.

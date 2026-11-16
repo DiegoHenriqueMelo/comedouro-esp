@@ -170,12 +170,60 @@ describe("remover comedouro", () => {
       screen.getByRole("button", { name: "Remover este comedouro" }),
     );
     expect(remove).not.toHaveBeenCalled();
-    await userEvent.click(
-      screen.getByRole("button", { name: "Remover de vez" }),
-    );
+    await userEvent.click(screen.getByRole("button", { name: "Remover" }));
 
     expect(remove).toHaveBeenCalledWith("f1");
     expect(window.location.pathname).toBe("/");
+  });
+
+  it("a confirmação é uma janela por cima da tela, com o foco em Cancelar", async () => {
+    render(<RemoveFeeder feederId="f1" />);
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Remover este comedouro" }),
+    );
+
+    const dialog = screen.getByRole("alertdialog", {
+      name: "Remover este comedouro?",
+    });
+    expect(dialog).toHaveAttribute("aria-modal", "true");
+    expect(screen.getByRole("button", { name: "Cancelar" })).toHaveFocus();
+  });
+
+  it("Esc ou tocar fora fecham a janela sem remover", async () => {
+    const remove = vi.spyOn(api, "removeFeeder").mockResolvedValue(null);
+    render(<RemoveFeeder feederId="f1" />);
+    const open = () =>
+      userEvent.click(
+        screen.getByRole("button", { name: "Remover este comedouro" }),
+      );
+
+    await open();
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+
+    await open();
+    const backdrop = screen.getByRole("alertdialog").parentElement;
+    if (!backdrop) throw new Error("sem fundo");
+    await userEvent.click(backdrop);
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+
+    expect(remove).not.toHaveBeenCalled();
+  });
+
+  it("se a remoção falhar, o motivo aparece dentro da janela", async () => {
+    vi.spyOn(api, "removeFeeder").mockRejectedValue(
+      new ApiError(0, "sem_conexao"),
+    );
+    render(<RemoveFeeder feederId="f1" />);
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Remover este comedouro" }),
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Remover" }));
+
+    const dialog = await screen.findByRole("alertdialog");
+    expect(dialog).toHaveTextContent("Sem conexão com o servidor.");
   });
 
   it("cancelar não remove nada", async () => {

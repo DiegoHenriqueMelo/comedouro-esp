@@ -619,6 +619,51 @@ select {
   cursor: default;
 }
 
+/* 5.13 Confirmação: a janela no centro. O fundo escurece em tinta, sem desfoque (proibição 3). */
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--e4);
+  background: rgba(43, 38, 35, 0.45);
+}
+
+.dialog {
+  display: flex;
+  flex-direction: column;
+  gap: var(--e3);
+  width: 100%;
+  max-width: 400px;
+  padding: var(--e5);
+  border: 1px solid var(--linha);
+  border-radius: var(--canto-cartao);
+  background: var(--cartao);
+  box-shadow: var(--sombra);
+}
+
+.dialog-title {
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.dialog p {
+  color: var(--tinta-suave);
+}
+
+.dialog-actions {
+  display: flex;
+  gap: var(--e2);
+  margin-top: var(--e2);
+}
+
+.dialog-actions .button {
+  flex: 1;
+}
+
 /* Pets: a foto redonda, ou a inicial do nome sobre o pêssego. */
 .pet-avatar {
   display: inline-flex;

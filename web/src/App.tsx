@@ -63,7 +63,7 @@ function SignedInApp(props: { user: User }) {
     return (
       <div className="app">
         <main className="page page-no-tabs">
-          <BackButton />
+          <BackButton label="Voltar" />
           {offline}
           <PetPage key={route.id ?? "novo"} id={route.id} />
         </main>
@@ -85,7 +85,7 @@ function SignedInApp(props: { user: User }) {
   return (
     <div className="app">
       <main className="page">
-        <BackButton />
+        <BackButton label="Comedouros" />
         {offline}
         <FeederScreen route={route} />
       </main>
@@ -108,11 +108,13 @@ function SignedInApp(props: { user: User }) {
   );
 }
 
-function BackButton() {
+// Volta para a tela inicial. O rótulo diz para onde: "Comedouros" de dentro de um comedouro,
+// "Voltar" de onde a tela inicial não é "a lista de comedouros" (o cadastro de um pet).
+function BackButton(props: { label: string }) {
   return (
     <button type="button" className="back" onClick={() => navigate("/")}>
       <Icon name="voltar" />
-      Comedouros
+      {props.label}
     </button>
   );
 }

@@ -5,11 +5,11 @@ import { fieldFor, messageFor } from "../messages";
 import { navigate } from "../router";
 import {
   Card,
+  ConfirmDialog,
   FeedbackLine,
   Field,
   LoadError,
   Loading,
-  Notice,
   parseNumber,
 } from "../ui";
 
@@ -503,8 +503,8 @@ export function RemoveFeeder(props: { feederId: string }) {
     if (ok) navigate("/");
   };
 
-  if (!confirming) {
-    return (
+  return (
+    <>
       <button
         type="button"
         className="button button-quiet"
@@ -512,39 +512,23 @@ export function RemoveFeeder(props: { feederId: string }) {
       >
         Remover este comedouro
       </button>
-    );
-  }
-
-  return (
-    <>
-      <Notice
-        tone="warn"
-        title="Remover este comedouro?"
-        action={
-          <div className="inline">
-            <button
-              type="button"
-              className="button"
-              disabled={action.busy}
-              onClick={() => void remove()}
-            >
-              {action.busy ? "Removendo…" : "Remover de vez"}
-            </button>
-            <button
-              type="button"
-              className="button button-quiet"
-              disabled={action.busy}
-              onClick={() => setConfirming(false)}
-            >
-              Cancelar
-            </button>
-          </div>
-        }
-      >
-        A agenda, os ajustes e o histórico são apagados. Se for um aparelho, ele
-        deixa de conectar e precisa ser cadastrado de novo.
-      </Notice>
-      <FeedbackLine feedback={action.feedback} />
+      {confirming && (
+        <ConfirmDialog
+          title="Remover este comedouro?"
+          confirmLabel="Remover"
+          busyLabel="Removendo…"
+          busy={action.busy}
+          feedback={action.feedback}
+          onConfirm={() => void remove()}
+          onCancel={() => {
+            setConfirming(false);
+            action.setFeedback(null);
+          }}
+        >
+          A agenda, os ajustes e o histórico são apagados. Se for um aparelho,
+          ele deixa de conectar e precisa ser cadastrado de novo.
+        </ConfirmDialog>
+      )}
     </>
   );
 }
