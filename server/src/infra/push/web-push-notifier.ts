@@ -1,7 +1,7 @@
 import { sendNotification } from "web-push";
 import type {
-  Notifier,
   PushSubscriptionRepository,
+  UserNotifier,
 } from "../../application/ports.js";
 
 type Log = { warn(obj: unknown, msg: string): void };
@@ -13,18 +13,18 @@ export type VapidKeys = {
   subject: string;
 };
 
-// Manda a notificação para todos os aparelhos que ativaram o push no PWA.
-export class WebPushNotifier implements Notifier {
+// Manda a notificação para todos os aparelhos em que a pessoa ativou o push no PWA.
+export class WebPushNotifier implements UserNotifier {
   constructor(
     private readonly subscriptions: PushSubscriptionRepository,
     private readonly vapid: VapidKeys,
     private readonly log: Log = { warn: () => {} },
   ) {}
 
-  async notify(title: string, body: string): Promise<void> {
+  async notify(userId: string, title: string, body: string): Promise<void> {
     const payload = JSON.stringify({ title, body });
 
-    for (const subscription of await this.subscriptions.list()) {
+    for (const subscription of await this.subscriptions.listByUser(userId)) {
       try {
         await sendNotification(subscription, payload, {
           vapidDetails: this.vapid,
@@ -44,12 +44,12 @@ export class WebPushNotifier implements Notifier {
 }
 
 // Usado quando o push não está configurado: a notificação vai só para o log.
-export class LogNotifier implements Notifier {
+export class LogNotifier implements UserNotifier {
   constructor(
     private readonly log: { info(obj: unknown, msg: string): void },
   ) {}
 
-  async notify(title: string, body: string): Promise<void> {
-    this.log.info({ title, body }, "aviso (push não configurado)");
+  async notify(userId: string, title: string, body: string): Promise<void> {
+    this.log.info({ userId, title, body }, "aviso (push não configurado)");
   }
 }

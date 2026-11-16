@@ -137,7 +137,6 @@ export class DeviceService {
 
     return {
       hora: now.toISOString(),
-      nomeDoGato: config.nomeDoGato,
       online,
       onlineDesde: onlineChangedAt?.toISOString() ?? null,
       estado: state?.state ?? null,

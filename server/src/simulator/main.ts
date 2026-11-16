@@ -9,21 +9,33 @@ loadEnvFiles();
 
 const url =
   process.env.SIM_MQTT_URL ??
-  process.env.MQTT_URL ??
   `mqtt://127.0.0.1:${process.env.MQTT_BROKER_PORT ?? "1883"}`;
 const catEats = Number(process.env.SIM_CAT_EATS_MINUTES ?? "10");
 
-const username = process.env.MQTT_USERNAME;
-const password = process.env.MQTT_PASSWORD;
+// O simulador entra como um aparelho: com o usuário e a senha que o app mostrou ao criar o comedouro.
+// O usuário é o próprio id do comedouro.
+const username = process.env.SIM_USUARIO;
+const password = process.env.SIM_SENHA;
+if (!username || !password) {
+  console.error(
+    [
+      "[simulador] faltam SIM_USUARIO e SIM_SENHA.",
+      "No app, adicione um comedouro do tipo “Tenho um aparelho”: ele mostra o usuário e a senha uma vez só.",
+      "Depois rode, por exemplo:",
+      "  SIM_USUARIO=<usuário> SIM_SENHA=<senha> pnpm simulador",
+    ].join("\n"),
+  );
+  process.exit(1);
+}
 
 const simulator = new MqttSimulator({
   url,
-  feederId: process.env.FEEDER_ID ?? "principal",
+  feederId: username,
   clock: systemClock,
   device: { catEatsAfterMinutes: catEats > 0 ? catEats : null },
   log: (message) => console.log(`[simulador] ${message}`),
-  ...(username ? { username } : {}),
-  ...(password ? { password } : {}),
+  username,
+  password,
 });
 simulator.startTicking();
 

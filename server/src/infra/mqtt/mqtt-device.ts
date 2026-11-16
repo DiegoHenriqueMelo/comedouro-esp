@@ -112,6 +112,20 @@ export class MqttDevice implements Device {
     );
   }
 
+  // Apaga as mensagens retidas: um aparelho removido não recebe mais a configuração antiga.
+  // Também limpa o estado e o "online" que o próprio aparelho deixou retidos.
+  async clearRetained(): Promise<void> {
+    if (!this.client.connected) return;
+    for (const topic of [
+      this.t.config,
+      this.t.sync,
+      this.t.state,
+      this.t.online,
+    ]) {
+      await this.client.publishAsync(topic, "", { qos: 1, retain: true });
+    }
+  }
+
   get connected(): boolean {
     return this.client.connected;
   }

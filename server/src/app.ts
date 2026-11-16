@@ -3,9 +3,11 @@ import fastifyCookie from "@fastify/cookie";
 import fastifyStatic from "@fastify/static";
 import Fastify, { type FastifyBaseLogger } from "fastify";
 import { ZodError } from "zod";
-import type { SimulatorControls } from "./application/ports.js";
 import type { System } from "./composition.js";
-import { ErroDeDominio } from "./domain/shared/erro-de-dominio.js";
+import {
+  ErroDeDominio,
+  NaoEncontrado,
+} from "./domain/shared/erro-de-dominio.js";
 import {
   type AuthOptions,
   registerAuthRoutes,
@@ -23,8 +25,6 @@ export type AppOptions = {
   auth: AuthOptions;
   // A pasta com o build do PWA (web/dist). Sem ela, o servidor só responde a API.
   webDist?: string | null;
-  // O dispositivo simulado, quando o servidor roda sem ESP32: libera a rota /v1/simulador.
-  simulator?: SimulatorControls | null;
 };
 
 // Monta o Fastify sem abrir porta: os testes usam `app.inject()`, e o `main.ts` chama o `listen`.
@@ -34,6 +34,10 @@ export function buildApp(options: AppOptions) {
     : Fastify({ logger: false });
 
   app.setErrorHandler((error: unknown, request, reply) => {
+    // Não existe, ou é de outra conta: a resposta é a mesma (D17).
+    if (error instanceof NaoEncontrado) {
+      return reply.code(404).send({ motivo: "nao_encontrado" });
+    }
     // Regra do domínio: o dado tem a forma certa, mas não faz sentido (422).
     if (error instanceof ErroDeDominio) {
       const status = error.codigo === "conflito_de_versao" ? 409 : 422;
@@ -79,11 +83,7 @@ export function buildApp(options: AppOptions) {
           request.user ? toUserDto(request.user) : null,
         );
         await privateScope.register(
-          registerRoutes(
-            options.system,
-            options.push,
-            options.simulator ?? null,
-          ),
+          registerRoutes(options.system, options.push),
         );
       });
     },

@@ -23,13 +23,11 @@ const optionalBoolean = z.preprocess(
 const schema = z.object({
   PORT: z.preprocess(emptyAsUndefined, z.coerce.number().int().default(3000)),
   HOST: z.preprocess(emptyAsUndefined, z.string().default("0.0.0.0")),
-  FEEDER_ID: z.preprocess(emptyAsUndefined, z.string().default("principal")),
 
   MONGO_URL: optional,
   MONGO_DB: z.preprocess(emptyAsUndefined, z.string().default("comedouro")),
 
   MQTT_BROKER_PORT: optionalPort,
-  MQTT_URL: optional,
   MQTT_USERNAME: optional,
   MQTT_PASSWORD: optional,
 
@@ -51,26 +49,26 @@ const schema = z.object({
   ),
 });
 
-export type DeviceMode =
-  | { kind: "simulado" }
-  | { kind: "broker_embutido"; port: number }
-  | { kind: "broker_externo"; url: string };
+// O broker MQTT embutido: é por ele que os aparelhos (ESP32) conectam. Sem ele, só há comedouros simulados.
+export type BrokerConfig = { port: number; username: string; password: string };
 
 export type Config = ReturnType<typeof loadConfig>;
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
   const e = schema.parse(env);
 
-  let device: DeviceMode = { kind: "simulado" };
+  let broker: BrokerConfig | null = null;
   if (e.MQTT_BROKER_PORT !== undefined) {
     if (!e.MQTT_USERNAME || !e.MQTT_PASSWORD) {
       throw new Error(
-        "MQTT_BROKER_PORT exige MQTT_USERNAME e MQTT_PASSWORD: o broker fica aberto na rede da casa.",
+        "MQTT_BROKER_PORT exige MQTT_USERNAME e MQTT_PASSWORD: é com eles que o próprio servidor entra no broker.",
       );
     }
-    device = { kind: "broker_embutido", port: e.MQTT_BROKER_PORT };
-  } else if (e.MQTT_URL) {
-    device = { kind: "broker_externo", url: e.MQTT_URL };
+    broker = {
+      port: e.MQTT_BROKER_PORT,
+      username: e.MQTT_USERNAME,
+      password: e.MQTT_PASSWORD,
+    };
   }
 
   const vapid =
@@ -87,11 +85,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
   return {
     port: e.PORT,
     host: e.HOST,
-    feederId: e.FEEDER_ID,
     mongo: e.MONGO_URL ? { url: e.MONGO_URL, db: e.MONGO_DB } : null,
-    device,
-    mqttUsername: e.MQTT_USERNAME,
-    mqttPassword: e.MQTT_PASSWORD,
+    broker,
     vapid,
     webDist: resolve(e.WEB_DIST ?? "../web/dist"),
     simCatEatsMinutes: e.SIM_CAT_EATS_MINUTES,

@@ -18,47 +18,49 @@ describe("API /v1: manutenção e conflito", () => {
   it("tarar a balança zera a tigela", async () => {
     t.simulated.setBowlGrams(30);
 
-    const res = await post("/v1/scale/tare");
+    const res = await post(`${t.base}/scale/tare`);
 
     expect(res.statusCode).toBe(200);
     expect(t.simulated.state().bowl.grams).toBe(0);
   });
 
   it("calibrar a balança e testar o servo são aceitos", async () => {
-    const scale = await post("/v1/scale/calibrate", { gramas: 500 });
-    const servo = await post("/v1/servo/test", { angulo: 60 });
+    const scale = await post(`${t.base}/scale/calibrate`, { gramas: 500 });
+    const servo = await post(`${t.base}/servo/test`, { angulo: 60 });
 
     expect(scale.statusCode).toBe(200);
     expect(servo.statusCode).toBe(200);
   });
 
   it("corpo errado nos comandos devolve 400", async () => {
-    expect((await post("/v1/scale/calibrate", { gramas: -5 })).statusCode).toBe(
+    expect(
+      (await post(`${t.base}/scale/calibrate`, { gramas: -5 })).statusCode,
+    ).toBe(400);
+    expect(
+      (await post(`${t.base}/servo/test`, { angulo: 200 })).statusCode,
+    ).toBe(400);
+    expect((await post(`${t.base}/calibrate`, { porcoes: 0 })).statusCode).toBe(
       400,
     );
-    expect((await post("/v1/servo/test", { angulo: 200 })).statusCode).toBe(
-      400,
-    );
-    expect((await post("/v1/calibrate", { porcoes: 0 })).statusCode).toBe(400);
   });
 
   it("soltar porções para pesar não conta no limite diário nem entra no histórico de refeições", async () => {
-    const res = await post("/v1/calibrate", { porcoes: 20 });
+    const res = await post(`${t.base}/calibrate`, { porcoes: 20 });
     await t.device.settled();
 
     expect(res.statusCode).toBe(200);
     expect(t.simulated.state().bowl.grams).toBe(120); // 20 porções de 6 g
 
     const status = (
-      await t.inject({ method: "GET", url: "/v1/status" })
+      await t.inject({ method: "GET", url: `${t.base}/status` })
     ).json();
     expect(status.hoje.porcoes).toBe(0);
   });
 
   it("comando enquanto o alimentador serve devolve 409", async () => {
-    await post("/v1/feed", { porcoes: 2 });
+    await post(`${t.base}/feed`, { porcoes: 2 });
 
-    const res = await post("/v1/scale/tare");
+    const res = await post(`${t.base}/scale/tare`);
 
     expect(res.statusCode).toBe(409);
     expect(res.json()).toEqual({ motivo: "ocupado" });
@@ -71,7 +73,7 @@ describe("API /v1: manutenção e conflito", () => {
 
     const res = await t.inject({
       method: "PUT",
-      url: "/v1/schedules",
+      url: `${t.base}/schedules`,
       payload: [{ hora: "07:30", porcoes: 2, ativo: true }],
     });
 
@@ -80,8 +82,8 @@ describe("API /v1: manutenção e conflito", () => {
   });
 
   it("o simulador só mexe no mundo físico por /v1/simulador, e valida o corpo", async () => {
-    const ok = await post("/v1/simulador", { tigelaGramas: 25 });
-    const bad = await post("/v1/simulador", { tigelaGramas: -1 });
+    const ok = await post(`${t.base}/simulador`, { tigelaGramas: 25 });
+    const bad = await post(`${t.base}/simulador`, { tigelaGramas: -1 });
 
     expect(ok.statusCode).toBe(200);
     expect(t.simulated.state().bowl.grams).toBe(25);

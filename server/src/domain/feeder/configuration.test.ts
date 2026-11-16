@@ -30,7 +30,6 @@ describe("Configuration", () => {
     { campos: { timeZone: "Europe/Lisbon" }, codigo: "fuso_invalido" },
     { campos: { bottleHeightMm: 10 }, codigo: "altura_garrafa_invalida" },
     { campos: { serveAngle: 200 }, codigo: "angulos_invalidos" },
-    { campos: { petName: "x".repeat(31) }, codigo: "nome_do_gato_invalido" },
     { campos: { fillAngle: 60, serveAngle: 60 }, codigo: "angulos_invalidos" },
   ])("recusa $campos com o código $codigo", ({ campos, codigo }) => {
     expect(() => Configuration.create(props(campos))).toThrow(
@@ -51,15 +50,5 @@ describe("Configuration", () => {
       }),
     );
     expect(c.timeZone).toBe("America/Manaus");
-  });
-
-  it("o nome do gato é opcional, e os espaços das pontas saem", () => {
-    expect(Configuration.default().petName).toBe("");
-    expect(Configuration.create(props({ petName: "  Mingau " })).petName).toBe(
-      "Mingau",
-    );
-    expect(
-      Configuration.create(props({ petName: "x".repeat(30) })).petName,
-    ).toHaveLength(30);
   });
 });

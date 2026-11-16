@@ -4,14 +4,14 @@ import { buildTestSystem } from "../test-support.js";
 type TestSystem = Awaited<ReturnType<typeof buildTestSystem>>;
 
 async function openAlerts(t: TestSystem): Promise<string[]> {
-  const status = await t.system.devices.getStatus();
+  const status = await t.runtime.devices.getStatus();
   return status.alertas.map((a) => a.tipo);
 }
 
 async function simulate(t: TestSystem, payload: object) {
   const res = await t.inject({
     method: "POST",
-    url: "/v1/simulador",
+    url: `${t.base}/simulador`,
     payload,
   });
   expect(res.statusCode).toBe(200);
@@ -23,21 +23,23 @@ describe("alertas", () => {
 
     expect(await openAlerts(t)).toEqual(["reiniciou"]);
     expect(t.notifier.sent).toHaveLength(1);
-    expect(t.notifier.sent[0]?.title).toBe("O alimentador reiniciou");
+    expect(t.notifier.sent[0]?.title).toBe("Cozinha: O alimentador reiniciou");
   });
 
   it("garrafa abaixo de 20% abre o alerta com os dias que faltam", async () => {
     const t = await buildTestSystem();
     await t.inject({
       method: "PUT",
-      url: "/v1/schedules",
+      url: `${t.base}/schedules`,
       payload: [{ hora: "07:30", porcoes: 5, ativo: true }],
     });
 
     await simulate(t, { garrafaGramas: 100 }); // 100 g de 900 g = 11%
 
     expect(await openAlerts(t)).toContain("garrafa_baixa");
-    const aviso = t.notifier.sent.find((n) => n.title === "Ração acabando");
+    const aviso = t.notifier.sent.find(
+      (n) => n.title === "Cozinha: Ração acabando",
+    );
     // 5 porções de 6 g por dia = 30 g por dia; 100 g dão para 3 dias.
     expect(aviso?.body).toContain("11%");
     expect(aviso?.body).toContain("3 dia");
@@ -50,7 +52,9 @@ describe("alertas", () => {
     await simulate(t, { garrafaGramas: 90 });
     await simulate(t, { garrafaGramas: 80 });
 
-    const avisos = t.notifier.sent.filter((n) => n.title === "Ração acabando");
+    const avisos = t.notifier.sent.filter(
+      (n) => n.title === "Cozinha: Ração acabando",
+    );
     expect(avisos).toHaveLength(1);
   });
 
@@ -62,7 +66,9 @@ describe("alertas", () => {
     expect(await openAlerts(t)).not.toContain("garrafa_baixa");
 
     await simulate(t, { garrafaGramas: 100 });
-    const avisos = t.notifier.sent.filter((n) => n.title === "Ração acabando");
+    const avisos = t.notifier.sent.filter(
+      (n) => n.title === "Cozinha: Ração acabando",
+    );
     expect(avisos).toHaveLength(2);
   });
 
@@ -80,7 +86,7 @@ describe("alertas", () => {
     const t = await buildTestSystem();
     expect(await openAlerts(t)).toEqual(["reiniciou"]);
 
-    const res = await t.inject({ method: "POST", url: "/v1/alerts/ack" });
+    const res = await t.inject({ method: "POST", url: `${t.base}/alerts/ack` });
 
     expect(res.statusCode).toBe(200);
     expect(await openAlerts(t)).toEqual([]);
@@ -88,21 +94,21 @@ describe("alertas", () => {
 
   it("dispositivo offline há mais de 30 min abre o alerta; ao voltar, fecha", async () => {
     const t = await buildTestSystem();
-    await t.system.devices.registerOnline(false);
+    await t.runtime.devices.registerOnline(false);
 
     t.clock.advanceMinutes(29);
-    await t.system.devices.checkOffline();
+    await t.runtime.devices.checkOffline();
     expect(await openAlerts(t)).not.toContain("offline");
 
     t.clock.advanceMinutes(2);
-    await t.system.devices.checkOffline();
-    await t.system.devices.checkOffline();
+    await t.runtime.devices.checkOffline();
+    await t.runtime.devices.checkOffline();
     expect(await openAlerts(t)).toContain("offline");
     expect(
-      t.notifier.sent.filter((n) => n.title === "Alimentador offline"),
+      t.notifier.sent.filter((n) => n.title === "Cozinha: Alimentador offline"),
     ).toHaveLength(1);
 
-    await t.system.devices.registerOnline(true);
+    await t.runtime.devices.registerOnline(true);
     expect(await openAlerts(t)).not.toContain("offline");
   });
 
@@ -114,13 +120,13 @@ describe("alertas", () => {
       at: t.clock.now(),
     };
 
-    await t.system.devices.registerEvent(event);
-    await t.system.devices.registerEvent(event);
+    await t.runtime.devices.registerEvent(event);
+    await t.runtime.devices.registerEvent(event);
 
-    const history = await t.system.devices.history(50);
+    const history = await t.runtime.devices.history(50);
     expect(history.filter((e) => e.seq === 50)).toHaveLength(1);
     expect(
-      t.notifier.sent.filter((n) => n.title === "Refeição pulada"),
+      t.notifier.sent.filter((n) => n.title === "Cozinha: Refeição pulada"),
     ).toHaveLength(1);
   });
 
@@ -129,20 +135,20 @@ describe("alertas", () => {
     const at = (minutes: number) =>
       new Date(t.clock.now().getTime() + minutes * 60_000);
 
-    await t.system.devices.registerEvent({
+    await t.runtime.devices.registerEvent({
       seq: 11,
       type: "refeicao_servida",
       at: at(20),
       portions: 1,
     });
-    await t.system.devices.registerEvent({
+    await t.runtime.devices.registerEvent({
       seq: 10,
       type: "refeicao_servida",
       at: at(10),
       portions: 2,
     });
 
-    const history = await t.system.devices.history(2);
+    const history = await t.runtime.devices.history(2);
     expect(history.map((e) => e.seq)).toEqual([11, 10]);
   });
 });
@@ -167,14 +173,14 @@ describe("notificações push: inscrição", () => {
       payload: subscription,
     });
     expect(added.statusCode).toBe(201);
-    expect(await t.subscriptions.list()).toEqual([subscription]);
+    expect(await t.subscriptions.listByUser(t.user.id)).toEqual([subscription]);
 
     await t.inject({
       method: "POST",
       url: "/v1/push/unsubscribe",
       payload: { endpoint: subscription.endpoint },
     });
-    expect(await t.subscriptions.list()).toEqual([]);
+    expect(await t.subscriptions.listByUser(t.user.id)).toEqual([]);
   });
 
   it("inscrição sem as chaves devolve 400", async () => {

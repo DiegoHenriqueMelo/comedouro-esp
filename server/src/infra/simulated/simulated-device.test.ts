@@ -9,7 +9,7 @@ const almoco = { hora: "12:30", porcoes: 2, ativo: true };
 async function setSchedule(t: TestSystem, agenda: object[]) {
   const res = await t.inject({
     method: "PUT",
-    url: "/v1/schedules",
+    url: `${t.base}/schedules`,
     payload: agenda,
   });
   expect(res.statusCode).toBe(200);
@@ -17,7 +17,7 @@ async function setSchedule(t: TestSystem, agenda: object[]) {
 }
 
 async function types(t: TestSystem): Promise<string[]> {
-  const history = await t.system.devices.history(50);
+  const history = await t.runtime.devices.history(50);
   return history.map((e) => e.tipo).reverse(); // do mais antigo para o mais recente
 }
 
@@ -42,7 +42,7 @@ describe("dispositivo simulado: a agenda", () => {
     await t.advance(30);
 
     expect(await types(t)).toEqual(["reiniciou", "refeicao_servida"]);
-    const [served] = await t.system.devices.history(1);
+    const [served] = await t.runtime.devices.history(1);
     expect(served).toMatchObject({ porcoes: 2, gramas: 12, origem: "agenda" });
   });
 
@@ -94,7 +94,9 @@ describe("dispositivo simulado: a agenda", () => {
       "refeicao_adiada",
       "refeicao_pulada",
     ]);
-    expect(t.notifier.sent.map((n) => n.title)).toContain("Refeição pulada");
+    expect(t.notifier.sent.map((n) => n.title)).toContain(
+      "Cozinha: Refeição pulada",
+    );
   });
 
   it("sem balança, a agenda continua só com os limites", async () => {
@@ -114,13 +116,13 @@ describe("dispositivo simulado: a agenda", () => {
     await setSchedule(t, [{ hora: "13:00", porcoes: 2, ativo: true }]);
     await t.inject({
       method: "POST",
-      url: "/v1/feed",
+      url: `${t.base}/feed`,
       payload: { porcoes: 9 },
     });
 
     await t.advance(61);
 
-    const history = await t.system.devices.history(1);
+    const history = await t.runtime.devices.history(1);
     expect(history[0]).toMatchObject({
       tipo: "refeicao_recusada",
       motivo: "limite_diario",
@@ -132,14 +134,14 @@ describe("dispositivo simulado: a agenda", () => {
     const t = await buildTestSystem();
     await t.inject({
       method: "POST",
-      url: "/v1/feed",
+      url: `${t.base}/feed`,
       payload: { porcoes: 10 },
     });
 
     await t.advance(60);
     const mesmoDia = await t.inject({
       method: "POST",
-      url: "/v1/feed",
+      url: `${t.base}/feed`,
       payload: {},
     });
     expect(mesmoDia.json()).toEqual({ motivo: "limite_diario" });
@@ -148,7 +150,7 @@ describe("dispositivo simulado: a agenda", () => {
     t.simulated.setBowlGrams(0); // o gato comeu
     const diaSeguinte = await t.inject({
       method: "POST",
-      url: "/v1/feed",
+      url: `${t.base}/feed`,
       payload: {},
     });
     expect(diaSeguinte.statusCode).toBe(202);
@@ -160,7 +162,7 @@ describe("dispositivo simulado: a agenda", () => {
 
     const res = await t.inject({
       method: "POST",
-      url: "/v1/feed",
+      url: `${t.base}/feed`,
       payload: {},
     });
     await t.device.settled();
@@ -171,12 +173,12 @@ describe("dispositivo simulado: a agenda", () => {
 
     const emVazio = await t.inject({
       method: "POST",
-      url: "/v1/feed",
+      url: `${t.base}/feed`,
       payload: {},
     });
     expect(emVazio.statusCode).toBe(409);
 
-    await t.inject({ method: "POST", url: "/v1/alerts/ack" });
+    await t.inject({ method: "POST", url: `${t.base}/alerts/ack` });
     await t.device.settled();
     expect(t.simulated.state().state).toBe("ocioso");
   });

@@ -1,15 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { buildSystem, type System } from "../../composition.js";
+import { hashPassword } from "../../application/credentials.js";
+import { DeviceAccess } from "../../application/device-access.js";
+import { FeederRuntime } from "../../application/feeder-runtime.js";
+import { FeederProfile } from "../../domain/feeder/feeder-profile.js";
 import { MqttSimulator } from "../../simulator/mqtt-simulator.js";
 import {
   FixedClock,
   MemoryAlertRepository,
+  MemoryDeviceCredentialRepository,
   MemoryDeviceEventRepository,
   MemoryDeviceStatusRepository,
   MemoryFeederRepository,
   MemoryNotifier,
-  MemorySessionRepository,
-  MemoryUserRepository,
 } from "../memory/memory-repositories.js";
 import { type EmbeddedBroker, startEmbeddedBroker } from "./embedded-broker.js";
 import { MqttDevice } from "./mqtt-device.js";
@@ -18,8 +20,10 @@ import { MqttDevice } from "./mqtt-device.js";
 // Nenhum caso de uso muda em relação ao dispositivo simulado em memória: só o adaptador.
 
 const NOON = new Date("2026-11-10T15:00:00.000Z");
+// O servidor entra com o usuário dele; o aparelho, com a credencial do comedouro "teste".
 const USER = "comedouro";
 const PASS = "segredo";
+const DEVICE_PASS = "senha-do-aparelho";
 
 async function waitFor(check: () => boolean | Promise<boolean>, ms = 5000) {
   const deadline = Date.now() + ms;
@@ -34,7 +38,8 @@ describe("MQTT: servidor, broker e dispositivo", () => {
   let url: string;
   let clock: FixedClock;
   let device: MqttDevice;
-  let system: System;
+  let system: FeederRuntime;
+  let credentials: MemoryDeviceCredentialRepository;
   let events: MemoryDeviceEventRepository;
   let simulators: MqttSimulator[];
 
@@ -46,26 +51,32 @@ describe("MQTT: servidor, broker e dispositivo", () => {
       feederId: "teste",
       commandTimeoutMs: 600,
     });
-    system = buildSystem({
-      feederRepository: new MemoryFeederRepository(),
-      eventRepository: events,
-      statusRepository: new MemoryDeviceStatusRepository(),
-      alertRepository: new MemoryAlertRepository(),
-      device,
-      notifier: new MemoryNotifier(),
+    system = new FeederRuntime(
+      FeederProfile.create({
+        id: "teste",
+        ownerId: "u1",
+        nickname: "Teste",
+        kind: "aparelho",
+        createdAt: NOON,
+      }),
+      {
+        feeder: new MemoryFeederRepository(),
+        events,
+        status: new MemoryDeviceStatusRepository(),
+        alerts: new MemoryAlertRepository(),
+      },
+      { device, simulator: null, run: () => {}, forget: async () => {} },
+      new MemoryNotifier(),
       clock,
-      users: new MemoryUserRepository(),
-      sessions: new MemorySessionRepository(),
-      identityVerifier: null,
-    });
+    );
     system.devices.start();
   }
 
   function startSimulator() {
     const simulator = new MqttSimulator({
       url,
-      username: USER,
-      password: PASS,
+      username: "teste",
+      password: DEVICE_PASS,
       feederId: "teste",
       clock,
       syncWaitMs: 300,
@@ -79,11 +90,20 @@ describe("MQTT: servidor, broker e dispositivo", () => {
     (await system.devices.getStatus()).config.versaoAplicada;
 
   beforeEach(async () => {
+    credentials = new MemoryDeviceCredentialRepository();
+    await credentials.save({
+      feederId: "teste",
+      username: "teste",
+      passwordHash: await hashPassword(DEVICE_PASS),
+    });
+    const access = new DeviceAccess(credentials, {
+      username: USER,
+      password: PASS,
+    });
     broker = await startEmbeddedBroker({
       port: 0,
       host: "127.0.0.1",
-      username: USER,
-      password: PASS,
+      authenticate: (user, pass) => access.authenticate(user, pass),
     });
     url = `mqtt://127.0.0.1:${broker.port}`;
     clock = new FixedClock(NOON);
@@ -173,12 +193,42 @@ describe("MQTT: servidor, broker e dispositivo", () => {
   it("senha errada não conecta no broker", async () => {
     const intruder = new MqttSimulator({
       url,
-      username: USER,
+      username: "teste",
       password: "errada",
       feederId: "teste",
       clock,
     });
     simulators.push(intruder);
+
+    await new Promise((resolve) => setTimeout(resolve, 400));
+
+    expect(await online()).toBe(false);
+  });
+
+  it("um aparelho não consegue se passar pelo comedouro de outra pessoa", async () => {
+    await credentials.save({
+      feederId: "outro",
+      username: "outro",
+      passwordHash: await hashPassword("senha-do-outro"),
+    });
+    // O aparelho do comedouro "outro" tenta publicar como se fosse o "teste".
+    const impostor = new MqttSimulator({
+      url,
+      username: "outro",
+      password: "senha-do-outro",
+      feederId: "teste",
+      clock,
+    });
+    simulators.push(impostor);
+
+    await new Promise((resolve) => setTimeout(resolve, 400));
+
+    expect(await online()).toBe(false);
+  });
+
+  it("com a credencial apagada (comedouro removido), o aparelho não entra mais", async () => {
+    await credentials.removeByFeeder("teste");
+    startSimulator();
 
     await new Promise((resolve) => setTimeout(resolve, 400));
 

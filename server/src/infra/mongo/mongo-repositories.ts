@@ -11,9 +11,14 @@ import type {
   Alert,
   AlertRepository,
   AlertType,
+  DeviceCredential,
+  DeviceCredentialRepository,
   DeviceEventRepository,
   DeviceStatusRepository,
+  FeederProfileRepository,
+  FeederRepositories,
   FeederRepository,
+  FeederStorage,
   PushSubscription,
   PushSubscriptionRepository,
   Session,
@@ -26,6 +31,10 @@ import type {
   DeviceStatus,
 } from "../../domain/device/device.js";
 import { Feeder } from "../../domain/feeder/feeder.js";
+import {
+  FeederProfile,
+  type FeederProfileProps,
+} from "../../domain/feeder/feeder-profile.js";
 import { ErroDeDominio } from "../../domain/shared/erro-de-dominio.js";
 import { User, type UserProps } from "../../domain/user/user.js";
 
@@ -257,7 +266,7 @@ export class MongoAlertRepository implements AlertRepository {
   }
 }
 
-type PushDoc = { _id: string; keys: PushSubscription["keys"] };
+type PushDoc = { _id: string; userId: string; keys: PushSubscription["keys"] };
 
 export class MongoPushSubscriptionRepository
   implements PushSubscriptionRepository
@@ -268,16 +277,21 @@ export class MongoPushSubscriptionRepository
     this.collection = db.collection<PushDoc>("push_subscriptions");
   }
 
-  async add(subscription: PushSubscription): Promise<void> {
+  async ensureIndexes(): Promise<void> {
+    await this.collection.createIndex({ userId: 1 });
+  }
+
+  // O mesmo celular inscrito por outra conta passa a ser dessa conta.
+  async add(userId: string, subscription: PushSubscription): Promise<void> {
     await this.collection.replaceOne(
       { _id: subscription.endpoint },
-      { keys: subscription.keys },
+      { userId, keys: subscription.keys },
       { upsert: true },
     );
   }
 
-  async list(): Promise<PushSubscription[]> {
-    const docs = await this.collection.find().toArray();
+  async listByUser(userId: string): Promise<PushSubscription[]> {
+    const docs = await this.collection.find({ userId }).toArray();
     return docs.map((d) => ({ endpoint: d._id, keys: d.keys }));
   }
 
@@ -356,5 +370,108 @@ export class MongoSessionRepository implements SessionRepository {
 
   async remove(tokenHash: string): Promise<void> {
     await this.collection.deleteOne({ _id: tokenHash });
+  }
+}
+
+// Os repositórios de cada comedouro são os de sempre, presos ao id dele.
+export class MongoFeederStorage implements FeederStorage {
+  constructor(private readonly db: Db) {}
+
+  async ensureIndexes(): Promise<void> {
+    await new MongoDeviceEventRepository(this.db, "").ensureIndexes();
+    await this.db.collection("alerts").createIndex({ feederId: 1 });
+  }
+
+  forFeeder(feederId: string): FeederRepositories {
+    return {
+      feeder: new MongoFeederRepository(this.db, feederId),
+      events: new MongoDeviceEventRepository(this.db, feederId),
+      status: new MongoDeviceStatusRepository(this.db, feederId),
+      alerts: new MongoAlertRepository(this.db, feederId),
+    };
+  }
+
+  async purge(feederId: string): Promise<void> {
+    await this.db
+      .collection<{ _id: string }>("feeders")
+      .deleteOne({ _id: feederId });
+    await this.db.collection("device_events").deleteMany({ feederId });
+    await this.db
+      .collection<{ _id: string }>("device_status")
+      .deleteOne({ _id: feederId });
+    await this.db.collection("alerts").deleteMany({ feederId });
+  }
+}
+
+type ProfileDoc = Omit<FeederProfileProps, "id"> & { _id: string };
+
+export class MongoFeederProfileRepository implements FeederProfileRepository {
+  private readonly collection: Collection<ProfileDoc>;
+
+  constructor(db: Db) {
+    this.collection = db.collection<ProfileDoc>("feeder_profiles");
+  }
+
+  async ensureIndexes(): Promise<void> {
+    await this.collection.createIndex({ ownerId: 1 });
+  }
+
+  async findById(id: string): Promise<FeederProfile | null> {
+    const doc = await this.collection.findOne({ _id: id });
+    return doc ? toProfile(doc) : null;
+  }
+
+  async listByOwner(ownerId: string): Promise<FeederProfile[]> {
+    return (await this.collection.find({ ownerId }).toArray()).map(toProfile);
+  }
+
+  async listAll(): Promise<FeederProfile[]> {
+    return (await this.collection.find().toArray()).map(toProfile);
+  }
+
+  async save(profile: FeederProfile): Promise<void> {
+    const { id, ...rest } = profile.toProps();
+    await this.collection.replaceOne({ _id: id }, rest, { upsert: true });
+  }
+
+  async remove(id: string): Promise<void> {
+    await this.collection.deleteOne({ _id: id });
+  }
+}
+
+function toProfile(doc: ProfileDoc): FeederProfile {
+  const { _id, ...rest } = doc;
+  return FeederProfile.restore({ id: _id, ...rest });
+}
+
+type CredentialDoc = Omit<DeviceCredential, "username"> & { _id: string };
+
+export class MongoDeviceCredentialRepository
+  implements DeviceCredentialRepository
+{
+  private readonly collection: Collection<CredentialDoc>;
+
+  constructor(db: Db) {
+    this.collection = db.collection<CredentialDoc>("device_credentials");
+  }
+
+  async ensureIndexes(): Promise<void> {
+    await this.collection.createIndex({ feederId: 1 });
+  }
+
+  async findByUsername(username: string): Promise<DeviceCredential | null> {
+    const doc = await this.collection.findOne({ _id: username });
+    if (!doc) return null;
+    const { _id, ...rest } = doc;
+    return { username: _id, ...rest };
+  }
+
+  async save(credential: DeviceCredential): Promise<void> {
+    const { username, ...rest } = credential;
+    await this.collection.replaceOne({ _id: username }, rest, { upsert: true });
+  }
+
+  async removeByFeeder(feederId: string): Promise<void> {
+    await this.collection.deleteMany({ feederId });
   }
 }

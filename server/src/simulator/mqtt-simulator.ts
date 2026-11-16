@@ -82,7 +82,19 @@ export class MqttSimulator {
       this.publishState();
     });
 
+    // Credencial recusada: o comedouro foi removido no app. O ESP32, aqui, volta ao modo de pareamento (F6).
+    this.client.on("error", (err) => {
+      const code = (err as { code?: number }).code;
+      if (code === 4 || code === 5) {
+        this.log("credencial recusada pelo broker: o comedouro foi removido?");
+        this.client.end(true);
+      }
+    });
+    this.client.on("close", () => this.log("desconectado do broker"));
+
     this.client.on("message", (topic, payload) => {
+      // Mensagem retida vazia: o servidor apagou aquele tópico (comedouro removido). Nada a fazer.
+      if (payload.length === 0) return;
       try {
         this.handle(topic, payload.toString("utf8"));
       } catch (err) {

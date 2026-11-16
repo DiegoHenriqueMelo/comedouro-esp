@@ -23,7 +23,7 @@ describe("API /v1", () => {
 
   describe("agenda", () => {
     it("GET /v1/schedules devolve a agenda vazia e a versão 1", async () => {
-      const res = await t.inject({ method: "GET", url: "/v1/schedules" });
+      const res = await t.inject({ method: "GET", url: `${t.base}/schedules` });
 
       expect(res.statusCode).toBe(200);
       expect(res.json()).toEqual({ versao: 1, agenda: [] });
@@ -32,7 +32,7 @@ describe("API /v1", () => {
     it("PUT /v1/schedules válido devolve a versão nova e a agenda em ordem de horário", async () => {
       const res = await t.inject({
         method: "PUT",
-        url: "/v1/schedules",
+        url: `${t.base}/schedules`,
         payload: [jantar, cafe],
       });
 
@@ -43,7 +43,7 @@ describe("API /v1", () => {
     it("PUT com porcoes: 'dois' devolve 400 (forma errada)", async () => {
       const res = await t.inject({
         method: "PUT",
-        url: "/v1/schedules",
+        url: `${t.base}/schedules`,
         payload: [{ hora: "07:30", porcoes: "dois" }],
       });
 
@@ -60,7 +60,7 @@ describe("API /v1", () => {
 
       const res = await t.inject({
         method: "PUT",
-        url: "/v1/schedules",
+        url: `${t.base}/schedules`,
         payload: nove,
       });
 
@@ -71,18 +71,18 @@ describe("API /v1", () => {
     it("uma agenda recusada não é salva", async () => {
       await t.inject({
         method: "PUT",
-        url: "/v1/schedules",
+        url: `${t.base}/schedules`,
         payload: [cafe, cafe],
       });
 
-      const res = await t.inject({ method: "GET", url: "/v1/schedules" });
+      const res = await t.inject({ method: "GET", url: `${t.base}/schedules` });
       expect(res.json()).toEqual({ versao: 1, agenda: [] });
     });
   });
 
   describe("configuração", () => {
     it("GET /v1/config devolve a configuração padrão e os fusos aceitos", async () => {
-      const res = await t.inject({ method: "GET", url: "/v1/config" });
+      const res = await t.inject({ method: "GET", url: `${t.base}/config` });
 
       expect(res.statusCode).toBe(200);
       expect(res.json().config.limiteDiarioPorcoes).toBe(10);
@@ -91,12 +91,12 @@ describe("API /v1", () => {
 
     it("PUT /v1/config válido sobe a versão e chega ao dispositivo", async () => {
       const { config } = (
-        await t.inject({ method: "GET", url: "/v1/config" })
+        await t.inject({ method: "GET", url: `${t.base}/config` })
       ).json();
 
       const res = await t.inject({
         method: "PUT",
-        url: "/v1/config",
+        url: `${t.base}/config`,
         payload: { ...config, limiteDiarioPorcoes: 12 },
       });
       await t.device.settled();
@@ -109,16 +109,16 @@ describe("API /v1", () => {
     it("PUT que baixa o limite para menos que a agenda devolve 422 (agenda_acima_do_limite)", async () => {
       await t.inject({
         method: "PUT",
-        url: "/v1/schedules",
+        url: `${t.base}/schedules`,
         payload: [cafe, jantar],
       });
       const { config } = (
-        await t.inject({ method: "GET", url: "/v1/config" })
+        await t.inject({ method: "GET", url: `${t.base}/config` })
       ).json();
 
       const res = await t.inject({
         method: "PUT",
-        url: "/v1/config",
+        url: `${t.base}/config`,
         payload: { ...config, limiteDiarioPorcoes: 4 },
       });
 
@@ -126,37 +126,10 @@ describe("API /v1", () => {
       expect(res.json().motivo).toBe("agenda_acima_do_limite");
     });
 
-    it("o nome do gato é salvo, aparece no status e não vai para o dispositivo", async () => {
-      const { config } = (
-        await t.inject({ method: "GET", url: "/v1/config" })
-      ).json();
-      expect(config.nomeDoGato).toBe("");
-
-      const res = await t.inject({
-        method: "PUT",
-        url: "/v1/config",
-        payload: { ...config, nomeDoGato: " Mingau " },
-      });
-      expect(res.json().config.nomeDoGato).toBe("Mingau");
-
-      const status = (
-        await t.inject({ method: "GET", url: "/v1/status" })
-      ).json();
-      expect(status.nomeDoGato).toBe("Mingau");
-
-      const longo = await t.inject({
-        method: "PUT",
-        url: "/v1/config",
-        payload: { ...config, nomeDoGato: "x".repeat(31) },
-      });
-      expect(longo.statusCode).toBe(422);
-      expect(longo.json().motivo).toBe("nome_do_gato_invalido");
-    });
-
     it("PUT sem um campo devolve 400", async () => {
       const res = await t.inject({
         method: "PUT",
-        url: "/v1/config",
+        url: `${t.base}/config`,
         payload: { limiteDiarioPorcoes: 12 },
       });
 
@@ -166,7 +139,7 @@ describe("API /v1", () => {
 
   describe("servir agora", () => {
     const feed = (payload: object = {}) =>
-      t.inject({ method: "POST", url: "/v1/feed", payload });
+      t.inject({ method: "POST", url: `${t.base}/feed`, payload });
 
     it("aceito devolve 202 e a refeição aparece no histórico e no status", async () => {
       const res = await feed({ porcoes: 2 });
@@ -175,7 +148,7 @@ describe("API /v1", () => {
       expect(res.statusCode).toBe(202);
 
       const history = (
-        await t.inject({ method: "GET", url: "/v1/history" })
+        await t.inject({ method: "GET", url: `${t.base}/history` })
       ).json();
       expect(history[0]).toMatchObject({
         tipo: "refeicao_servida",
@@ -185,7 +158,7 @@ describe("API /v1", () => {
       });
 
       const status = (
-        await t.inject({ method: "GET", url: "/v1/status" })
+        await t.inject({ method: "GET", url: `${t.base}/status` })
       ).json();
       expect(status.hoje).toEqual({ porcoes: 2, gramas: 12 });
       expect(status.ultimaRefeicao.porcoes).toBe(2);
@@ -252,20 +225,20 @@ describe("API /v1", () => {
     it("GET /v1/history com limit acima de 200 devolve 400", async () => {
       const res = await t.inject({
         method: "GET",
-        url: "/v1/history?limit=500",
+        url: `${t.base}/history?limit=500`,
       });
 
       expect(res.statusCode).toBe(400);
     });
 
     it("o histórico vem do mais recente para o mais antigo", async () => {
-      await t.inject({ method: "POST", url: "/v1/feed", payload: {} });
+      await t.inject({ method: "POST", url: `${t.base}/feed`, payload: {} });
       await t.advance(40);
-      await t.inject({ method: "POST", url: "/v1/feed", payload: {} });
+      await t.inject({ method: "POST", url: `${t.base}/feed`, payload: {} });
       await t.device.settled();
 
       const history = (
-        await t.inject({ method: "GET", url: "/v1/history?limit=2" })
+        await t.inject({ method: "GET", url: `${t.base}/history?limit=2` })
       ).json();
 
       expect(history).toHaveLength(2);
@@ -274,13 +247,13 @@ describe("API /v1", () => {
 
     it("o status mostra a próxima refeição ativa: a de hoje ou, se já passou, a primeira de amanhã", async () => {
       const status = async () =>
-        (await t.inject({ method: "GET", url: "/v1/status" })).json();
+        (await t.inject({ method: "GET", url: `${t.base}/status` })).json();
       expect((await status()).proximaRefeicao).toBeNull();
 
       // São 12:00. O almoço das 12:10 está desativado, então a próxima é o jantar.
       await t.inject({
         method: "PUT",
-        url: "/v1/schedules",
+        url: `${t.base}/schedules`,
         payload: [cafe, { hora: "12:10", porcoes: 1, ativo: false }, jantar],
       });
       expect((await status()).proximaRefeicao).toEqual({
@@ -300,7 +273,7 @@ describe("API /v1", () => {
 
     it("o status mostra o dispositivo online, sincronizado e simulado", async () => {
       const status = (
-        await t.inject({ method: "GET", url: "/v1/status" })
+        await t.inject({ method: "GET", url: `${t.base}/status` })
       ).json();
 
       expect(status.online).toBe(true);
@@ -316,20 +289,20 @@ describe("API /v1", () => {
     it("o 'hoje' usa o fuso da configuração: 22:30 de Brasília conta no dia certo", async () => {
       // 22:30 em Brasília do dia 10 já é 01:30 UTC do dia 11.
       t.clock.set(new Date("2026-11-11T01:30:00.000Z"));
-      await t.inject({ method: "POST", url: "/v1/feed", payload: {} });
+      await t.inject({ method: "POST", url: `${t.base}/feed`, payload: {} });
       await t.device.settled();
 
       // Ainda dia 10 em Brasília: a refeição conta.
       t.clock.set(new Date("2026-11-11T02:30:00.000Z"));
       const antes = (
-        await t.inject({ method: "GET", url: "/v1/status" })
+        await t.inject({ method: "GET", url: `${t.base}/status` })
       ).json();
       expect(antes.hoje.porcoes).toBe(1);
 
       // 00:30 do dia 11 em Brasília: virou o dia, não conta mais.
       t.clock.set(new Date("2026-11-11T03:30:00.000Z"));
       const depois = (
-        await t.inject({ method: "GET", url: "/v1/status" })
+        await t.inject({ method: "GET", url: `${t.base}/status` })
       ).json();
       expect(depois.hoje.porcoes).toBe(0);
     });
@@ -348,7 +321,7 @@ describe("API /v1", () => {
         throw new Error("senha do banco: 123456");
       };
 
-      const res = await t.inject({ method: "GET", url: "/v1/schedules" });
+      const res = await t.inject({ method: "GET", url: `${t.base}/schedules` });
 
       expect(res.statusCode).toBe(500);
       expect(res.json()).toEqual({ motivo: "erro_interno" });

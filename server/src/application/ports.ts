@@ -6,6 +6,10 @@ import type {
   DeviceStatus,
 } from "../domain/device/device.js";
 import type { Feeder } from "../domain/feeder/feeder.js";
+import type {
+  FeederKind,
+  FeederProfile,
+} from "../domain/feeder/feeder-profile.js";
 import type { Identity, User } from "../domain/user/user.js";
 import type { ConfigPayload } from "./dto.js";
 
@@ -77,8 +81,14 @@ export interface AlertRepository {
   close(type: AlertType): Promise<void>;
 }
 
+// Os avisos de UM comedouro. Quem monta o comedouro liga isto ao dono dele.
 export interface Notifier {
   notify(title: string, body: string): Promise<void>;
+}
+
+// Manda uma notificação para todos os aparelhos de uma pessoa (D16).
+export interface UserNotifier {
+  notify(userId: string, title: string, body: string): Promise<void>;
 }
 
 export type PushSubscription = {
@@ -86,10 +96,64 @@ export type PushSubscription = {
   keys: { p256dh: string; auth: string };
 };
 
+// Cada inscrição é de uma pessoa: o celular de quem ativou as notificações.
 export interface PushSubscriptionRepository {
-  add(subscription: PushSubscription): Promise<void>;
-  list(): Promise<PushSubscription[]>;
+  add(userId: string, subscription: PushSubscription): Promise<void>;
+  listByUser(userId: string): Promise<PushSubscription[]>;
   remove(endpoint: string): Promise<void>;
+}
+
+export interface FeederProfileRepository {
+  findById(id: string): Promise<FeederProfile | null>;
+  listByOwner(ownerId: string): Promise<FeederProfile[]>;
+  listAll(): Promise<FeederProfile[]>;
+  // Cria ou substitui.
+  save(profile: FeederProfile): Promise<void>;
+  remove(id: string): Promise<void>;
+}
+
+// Os repositórios de um comedouro, separados pelo id dele.
+export type FeederRepositories = {
+  feeder: FeederRepository;
+  events: DeviceEventRepository;
+  status: DeviceStatusRepository;
+  alerts: AlertRepository;
+};
+
+export interface FeederStorage {
+  forFeeder(feederId: string): FeederRepositories;
+  // Apaga tudo o que é daquele comedouro: agenda, configuração, histórico, estado e alertas.
+  purge(feederId: string): Promise<void>;
+}
+
+// O usuário e a senha MQTT de um aparelho. A senha fica só como hash.
+export type DeviceCredential = {
+  feederId: string;
+  username: string;
+  passwordHash: string;
+};
+
+export interface DeviceCredentialRepository {
+  findByUsername(username: string): Promise<DeviceCredential | null>;
+  save(credential: DeviceCredential): Promise<void>;
+  removeByFeeder(feederId: string): Promise<void>;
+}
+
+// Um dispositivo pronto para ligar a um comedouro.
+export type DeviceHandle = {
+  device: Device;
+  // Só nos simulados: o "mundo físico" de mentira.
+  simulator: SimulatorControls | null;
+  // Começa a rodar (o simulado passa a seguir a agenda sozinho).
+  run(): void;
+  // Esquece o comedouro: o aparelho removido não recebe mais a configuração antiga.
+  forget(): Promise<void>;
+};
+
+export interface DeviceFactory {
+  // false quando o servidor não tem broker MQTT: aí só dá para criar comedouros simulados.
+  readonly supportsHardware: boolean;
+  create(feederId: string, kind: FeederKind): DeviceHandle;
 }
 
 // Confere a credencial que o app recebeu do Google. Devolve null se ela for falsa, vencida ou de outro app.

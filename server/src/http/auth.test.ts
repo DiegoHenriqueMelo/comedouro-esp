@@ -23,7 +23,7 @@ describe("login e sessão", () => {
   it("sem sessão, a API responde 401", async () => {
     t = await buildTestSystem();
 
-    const res = await t.app.inject({ method: "GET", url: "/v1/status" });
+    const res = await t.app.inject({ method: "GET", url: `${t.base}/status` });
 
     expect(res.statusCode).toBe(401);
     expect(res.json()).toEqual({ motivo: "nao_autenticado" });
@@ -34,7 +34,7 @@ describe("login e sessão", () => {
 
     const res = await t.app.inject({
       method: "GET",
-      url: "/v1/status",
+      url: `${t.base}/status`,
       headers: { cookie: "sessao=inventado" },
     });
 
@@ -121,7 +121,7 @@ describe("login e sessão", () => {
     expect(logout.statusCode).toBe(204);
     expect(String(logout.headers["set-cookie"])).toContain("sessao=;");
 
-    const res = await t.inject({ method: "GET", url: "/v1/status" });
+    const res = await t.inject({ method: "GET", url: `${t.base}/status` });
     expect(res.statusCode).toBe(401);
   });
 
@@ -150,7 +150,7 @@ describe("login e sessão", () => {
 
       const res = await t.inject({
         method: "POST",
-        url: "/v1/feed",
+        url: `${t.base}/feed`,
         payload: { porcoes: 1 },
         headers: {
           origin: "https://site-malicioso.example",
@@ -167,7 +167,7 @@ describe("login e sessão", () => {
 
       const res = await t.inject({
         method: "POST",
-        url: "/v1/alerts/ack",
+        url: `${t.base}/alerts/ack`,
         headers: { origin: "https://app.local", host: "app.local" },
       });
 

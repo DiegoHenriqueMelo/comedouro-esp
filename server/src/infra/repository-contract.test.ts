@@ -3,30 +3,40 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { fromScheduleDto } from "../application/dto.js";
 import type {
   AlertRepository,
+  DeviceCredentialRepository,
   DeviceEventRepository,
   DeviceStatusRepository,
+  FeederProfileRepository,
   FeederRepository,
+  FeederStorage,
   PushSubscriptionRepository,
   SessionRepository,
   UserRepository,
 } from "../application/ports.js";
 import type { DeviceEvent } from "../domain/device/device.js";
 import { Feeder } from "../domain/feeder/feeder.js";
+import { FeederProfile } from "../domain/feeder/feeder-profile.js";
 import { User } from "../domain/user/user.js";
 import {
   MemoryAlertRepository,
+  MemoryDeviceCredentialRepository,
   MemoryDeviceEventRepository,
   MemoryDeviceStatusRepository,
+  MemoryFeederProfileRepository,
   MemoryFeederRepository,
+  MemoryFeederStorage,
   MemoryPushSubscriptionRepository,
   MemorySessionRepository,
   MemoryUserRepository,
 } from "./memory/memory-repositories.js";
 import {
   MongoAlertRepository,
+  MongoDeviceCredentialRepository,
   MongoDeviceEventRepository,
   MongoDeviceStatusRepository,
+  MongoFeederProfileRepository,
   MongoFeederRepository,
+  MongoFeederStorage,
   MongoPushSubscriptionRepository,
   MongoSessionRepository,
   MongoUserRepository,
@@ -43,6 +53,9 @@ type Repositories = {
   subscriptions: PushSubscriptionRepository;
   users: UserRepository;
   sessions: SessionRepository;
+  profiles: FeederProfileRepository;
+  credentials: DeviceCredentialRepository;
+  storage: FeederStorage;
 };
 
 const cafe = fromScheduleDto([{ hora: "07:30", porcoes: 2, ativo: true }]);
@@ -216,12 +229,94 @@ function contract(name: string, create: () => Promise<Repositories>) {
       };
 
       it("a mesma inscrição duas vezes fica uma só, e remover apaga", async () => {
-        await r.subscriptions.add(sub);
-        await r.subscriptions.add(sub);
-        expect(await r.subscriptions.list()).toEqual([sub]);
+        await r.subscriptions.add("u1", sub);
+        await r.subscriptions.add("u1", sub);
+        expect(await r.subscriptions.listByUser("u1")).toEqual([sub]);
 
         await r.subscriptions.remove(sub.endpoint);
-        expect(await r.subscriptions.list()).toEqual([]);
+        expect(await r.subscriptions.listByUser("u1")).toEqual([]);
+      });
+
+      it("cada pessoa só recebe nos aparelhos dela", async () => {
+        const outro = { ...sub, endpoint: "https://push.example.com/xyz" };
+        await r.subscriptions.add("u1", sub);
+        await r.subscriptions.add("u2", outro);
+
+        expect(await r.subscriptions.listByUser("u1")).toEqual([sub]);
+        expect(await r.subscriptions.listByUser("u2")).toEqual([outro]);
+      });
+
+      it("o celular inscrito por outra conta passa a ser dela", async () => {
+        await r.subscriptions.add("u1", sub);
+        await r.subscriptions.add("u2", sub);
+
+        expect(await r.subscriptions.listByUser("u1")).toEqual([]);
+        expect(await r.subscriptions.listByUser("u2")).toEqual([sub]);
+      });
+    });
+
+    describe("perfis de comedouro", () => {
+      const perfil = (id: string, ownerId: string) =>
+        FeederProfile.create({
+          id,
+          ownerId,
+          nickname: `Comedouro ${id}`,
+          kind: "simulado",
+          createdAt: at(0),
+        });
+
+      it("lista por dono, acha por id, substitui e remove", async () => {
+        await r.profiles.save(perfil("f1", "u1"));
+        await r.profiles.save(perfil("f2", "u1"));
+        await r.profiles.save(perfil("f3", "u2"));
+
+        const meus = await r.profiles.listByOwner("u1");
+        expect(meus.map((p) => p.id).sort()).toEqual(["f1", "f2"]);
+        expect((await r.profiles.listAll()).length).toBe(3);
+
+        const f1 = perfil("f1", "u1");
+        f1.rename("Sala");
+        await r.profiles.save(f1);
+        expect((await r.profiles.findById("f1"))?.toProps()).toEqual(
+          f1.toProps(),
+        );
+
+        await r.profiles.remove("f1");
+        expect(await r.profiles.findById("f1")).toBeNull();
+      });
+    });
+
+    describe("credenciais dos aparelhos", () => {
+      it("acha pelo usuário e apaga pelo comedouro", async () => {
+        const credencial = {
+          feederId: "f1",
+          username: "f1",
+          passwordHash: "scrypt:aa:bb",
+        };
+        await r.credentials.save(credencial);
+        expect(await r.credentials.findByUsername("f1")).toEqual(credencial);
+
+        await r.credentials.removeByFeeder("f1");
+        expect(await r.credentials.findByUsername("f1")).toBeNull();
+      });
+    });
+
+    describe("dados por comedouro", () => {
+      it("cada comedouro tem os seus, e apagar um não mexe no outro", async () => {
+        const a = r.storage.forFeeder("a");
+        const b = r.storage.forFeeder("b");
+        await a.feeder.save(Feeder.create(), null);
+        await b.feeder.save(Feeder.create(), null);
+        await a.events.add({ seq: 1, type: "reiniciou", at: at(0) });
+        await b.events.add({ seq: 1, type: "reiniciou", at: at(0) });
+
+        await r.storage.purge("a");
+
+        const a2 = r.storage.forFeeder("a");
+        expect(await a2.feeder.load()).toBeNull();
+        expect(await a2.events.lastSeq()).toBe(0);
+        expect(await r.storage.forFeeder("b").feeder.load()).not.toBeNull();
+        expect(await r.storage.forFeeder("b").events.lastSeq()).toBe(1);
       });
     });
 
@@ -287,6 +382,9 @@ contract("memória", async () => ({
   subscriptions: new MemoryPushSubscriptionRepository(),
   users: new MemoryUserRepository(),
   sessions: new MemorySessionRepository(),
+  profiles: new MemoryFeederProfileRepository(),
+  credentials: new MemoryDeviceCredentialRepository(),
+  storage: new MemoryFeederStorage(),
 }));
 
 // Os testes do MongoDB precisam de um banco no ar: `docker compose up -d mongo` na raiz do repo.
@@ -335,6 +433,8 @@ describe.skipIf(!(await mongoIsUp()))("MongoDB", () => {
     await users.ensureIndexes();
     const sessions = new MongoSessionRepository(db);
     await sessions.ensureIndexes();
+    const storage = new MongoFeederStorage(db);
+    await storage.ensureIndexes();
 
     return {
       feeders: new MongoFeederRepository(db, "teste"),
@@ -344,6 +444,9 @@ describe.skipIf(!(await mongoIsUp()))("MongoDB", () => {
       subscriptions: new MongoPushSubscriptionRepository(db),
       users,
       sessions,
+      profiles: new MongoFeederProfileRepository(db),
+      credentials: new MongoDeviceCredentialRepository(db),
+      storage,
     };
   });
 });

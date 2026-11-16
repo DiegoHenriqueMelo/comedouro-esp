@@ -10,19 +10,28 @@ import type {
   Alert,
   AlertRepository,
   AlertType,
+  DeviceCredential,
+  DeviceCredentialRepository,
   DeviceEventRepository,
   DeviceStatusRepository,
+  FeederProfileRepository,
+  FeederRepositories,
   FeederRepository,
+  FeederStorage,
   IdentityVerifier,
-  Notifier,
   PushSubscription,
   PushSubscriptionRepository,
   Session,
   SessionRepository,
+  UserNotifier,
   UserRepository,
 } from "../../application/ports.js";
 import type { DeviceEvent, DeviceStatus } from "../../domain/device/device.js";
 import { Feeder } from "../../domain/feeder/feeder.js";
+import {
+  FeederProfile,
+  type FeederProfileProps,
+} from "../../domain/feeder/feeder-profile.js";
 import { ErroDeDominio } from "../../domain/shared/erro-de-dominio.js";
 import { type Identity, User } from "../../domain/user/user.js";
 
@@ -126,14 +135,19 @@ export class MemoryAlertRepository implements AlertRepository {
 export class MemoryPushSubscriptionRepository
   implements PushSubscriptionRepository
 {
-  private readonly byEndpoint = new Map<string, PushSubscription>();
+  private readonly byEndpoint = new Map<
+    string,
+    { userId: string; subscription: PushSubscription }
+  >();
 
-  async add(subscription: PushSubscription): Promise<void> {
-    this.byEndpoint.set(subscription.endpoint, subscription);
+  async add(userId: string, subscription: PushSubscription): Promise<void> {
+    this.byEndpoint.set(subscription.endpoint, { userId, subscription });
   }
 
-  async list(): Promise<PushSubscription[]> {
-    return [...this.byEndpoint.values()];
+  async listByUser(userId: string): Promise<PushSubscription[]> {
+    return [...this.byEndpoint.values()]
+      .filter((entry) => entry.userId === userId)
+      .map((entry) => entry.subscription);
   }
 
   async remove(endpoint: string): Promise<void> {
@@ -197,12 +211,85 @@ export class FakeIdentityVerifier implements IdentityVerifier {
   }
 }
 
-// Guarda as notificações numa lista: para os testes, e para quando o push não está configurado.
-export class MemoryNotifier implements Notifier {
-  readonly sent: { title: string; body: string }[] = [];
+// Guarda as notificações numa lista, para os testes.
+export class MemoryNotifier implements UserNotifier {
+  readonly sent: { userId: string; title: string; body: string }[] = [];
 
-  async notify(title: string, body: string): Promise<void> {
-    this.sent.push({ title, body });
+  async notify(userId: string, title: string, body: string): Promise<void> {
+    this.sent.push({ userId, title, body });
+  }
+}
+
+export class MemoryFeederProfileRepository implements FeederProfileRepository {
+  private readonly byId = new Map<string, FeederProfileProps>();
+
+  async findById(id: string): Promise<FeederProfile | null> {
+    const props = this.byId.get(id);
+    return props ? FeederProfile.restore(props) : null;
+  }
+
+  async listByOwner(ownerId: string): Promise<FeederProfile[]> {
+    return (await this.listAll()).filter((p) => p.ownerId === ownerId);
+  }
+
+  async listAll(): Promise<FeederProfile[]> {
+    return [...this.byId.values()].map((p) => FeederProfile.restore(p));
+  }
+
+  async save(profile: FeederProfile): Promise<void> {
+    this.byId.set(profile.id, profile.toProps());
+  }
+
+  async remove(id: string): Promise<void> {
+    this.byId.delete(id);
+  }
+}
+
+// Um conjunto de repositórios em memória para cada comedouro.
+export class MemoryFeederStorage implements FeederStorage {
+  private readonly byFeeder = new Map<string, FeederRepositories>();
+
+  forFeeder(feederId: string): FeederRepositories {
+    let repositories = this.byFeeder.get(feederId);
+    if (!repositories) {
+      repositories = {
+        feeder: new MemoryFeederRepository(),
+        events: new MemoryDeviceEventRepository(),
+        status: new MemoryDeviceStatusRepository(),
+        alerts: new MemoryAlertRepository(),
+      };
+      this.byFeeder.set(feederId, repositories);
+    }
+    return repositories;
+  }
+
+  async purge(feederId: string): Promise<void> {
+    this.byFeeder.delete(feederId);
+  }
+
+  has(feederId: string): boolean {
+    return this.byFeeder.has(feederId);
+  }
+}
+
+export class MemoryDeviceCredentialRepository
+  implements DeviceCredentialRepository
+{
+  private readonly byUsername = new Map<string, DeviceCredential>();
+
+  async findByUsername(username: string): Promise<DeviceCredential | null> {
+    const credential = this.byUsername.get(username);
+    return credential ? { ...credential } : null;
+  }
+
+  async save(credential: DeviceCredential): Promise<void> {
+    this.byUsername.set(credential.username, { ...credential });
+  }
+
+  async removeByFeeder(feederId: string): Promise<void> {
+    for (const [username, credential] of this.byUsername) {
+      if (credential.feederId === feederId) this.byUsername.delete(username);
+    }
   }
 }
 

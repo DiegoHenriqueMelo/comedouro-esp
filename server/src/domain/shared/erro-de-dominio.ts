@@ -14,7 +14,10 @@ export type CodigoDeErro =
   | "fuso_invalido"
   | "altura_garrafa_invalida"
   | "angulos_invalidos"
-  | "nome_do_gato_invalido"
+  | "apelido_invalido"
+  | "limite_de_comedouros"
+  | "limite_de_simulados"
+  | "aparelho_indisponivel"
   | "conflito_de_versao";
 
 export class ErroDeDominio extends Error {
@@ -24,5 +27,13 @@ export class ErroDeDominio extends Error {
     super(mensagem);
     this.name = "ErroDeDominio";
     this.codigo = codigo;
+  }
+}
+
+// O recurso não existe, ou é de outra conta (D17: as duas respostas são iguais, 404).
+export class NaoEncontrado extends Error {
+  constructor(mensagem = "não encontrado") {
+    super(mensagem);
+    this.name = "NaoEncontrado";
   }
 }

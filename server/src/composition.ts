@@ -1,29 +1,28 @@
-import { AlertService } from "./application/alert-service.js";
 import { AuthService } from "./application/auth-service.js";
-import { DeviceService } from "./application/device-service.js";
-import { FeederService } from "./application/feeder-service.js";
+import { FeederCatalog } from "./application/feeder-catalog.js";
 import type {
-  AlertRepository,
   Clock,
-  Device,
-  DeviceEventRepository,
-  DeviceStatusRepository,
-  FeederRepository,
+  DeviceCredentialRepository,
+  DeviceFactory,
+  FeederProfileRepository,
+  FeederStorage,
   IdentityVerifier,
-  Notifier,
   SessionRepository,
+  UserNotifier,
   UserRepository,
 } from "./application/ports.js";
 
-type Log = { warn(obj: unknown, msg: string): void };
+type Log = {
+  warn(obj: unknown, msg: string): void;
+  error(obj: unknown, msg: string): void;
+};
 
 export type SystemParts = {
-  feederRepository: FeederRepository;
-  eventRepository: DeviceEventRepository;
-  statusRepository: DeviceStatusRepository;
-  alertRepository: AlertRepository;
-  device: Device;
-  notifier: Notifier;
+  profiles: FeederProfileRepository;
+  storage: FeederStorage;
+  devices: DeviceFactory;
+  credentials: DeviceCredentialRepository;
+  notifier: UserNotifier;
   clock: Clock;
   users: UserRepository;
   sessions: SessionRepository;
@@ -36,25 +35,15 @@ export type System = ReturnType<typeof buildSystem>;
 
 // Monta os casos de uso a partir dos adaptadores. O `main.ts` passa os de verdade; os testes, os de memória.
 export function buildSystem(parts: SystemParts) {
-  const feeders = new FeederService(
-    parts.feederRepository,
-    parts.device,
-    parts.log,
-  );
-  const alerts = new AlertService(
-    parts.alertRepository,
-    parts.notifier,
-    parts.clock,
-    parts.log,
-  );
-  const devices = new DeviceService(
-    parts.device,
-    parts.eventRepository,
-    parts.statusRepository,
-    feeders,
-    alerts,
-    parts.clock,
-  );
+  const catalog = new FeederCatalog({
+    profiles: parts.profiles,
+    storage: parts.storage,
+    devices: parts.devices,
+    credentials: parts.credentials,
+    notifier: parts.notifier,
+    clock: parts.clock,
+    ...(parts.log ? { log: parts.log } : {}),
+  });
 
   const auth = new AuthService(
     parts.users,
@@ -63,5 +52,5 @@ export function buildSystem(parts: SystemParts) {
     parts.clock,
   );
 
-  return { feeders, alerts, devices, auth };
+  return { catalog, auth };
 }
