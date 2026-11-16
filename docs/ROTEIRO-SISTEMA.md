@@ -1,7 +1,7 @@
 # Dispenser de Ração — Roteiro do Sistema (servidor + PWA)
 
 > Trilha guiada do software que roda fora do ESP32: servidor Fastify com DDD, MongoDB, conversa com o ESP32 por MQTT e PWA instalado no celular.
-> Complementa o [PLANO-DE-ACAO.md](PLANO-DE-ACAO.md). Começada em 30/10/2026.
+> Complementa o [PLANO-DE-ACAO.md](PLANO-DE-ACAO.md). Começada em 30/10/2026. A fase seguinte (contas, vários comedouros e nuvem) está no [ROTEIRO-PRODUTO.md](ROTEIRO-PRODUTO.md).
 > **Formato:** mentoria com TDD. Você escreve os testes e o código; o Claude explica o conceito, define o que testar e revisa. O método está em [mentoria.md](mentoria.md). A mentoria valeu da E0 até a metade da E3. Em 10/11/2026, a pedido do usuário, o Claude implementou o restante.
 >
 > **Progresso (12/11/2026):** E0 a E10 concluídas. E11, E12 e E13 têm o código pronto e dependem de passos seus: HTTPS com Tailscale, teste da notificação no celular, IP reservado e backup agendado. São 166 testes no servidor e 25 no app. Para instalar e usar, veja o [guia](GUIA.md).
