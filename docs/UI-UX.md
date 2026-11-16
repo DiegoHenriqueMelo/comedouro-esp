@@ -214,6 +214,17 @@ Toda tela que busca dados tem os três estados desenhados:
 - **Carregando:** o texto "Carregando…" em tinta suave. Sem esqueleto animado e sem girador.
 - **Erro:** um aviso de problema, com o botão "Tentar de novo".
 
+### 5.13 Confirmação (pop-up)
+
+Para ações que não têm volta: remover um comedouro, remover um pet. Decidido em 16/11/2026: **só as confirmações** viram pop-up. As respostas de uma ação ("Pet salvo.", "A tigela ainda tem 12 g.") continuam embaixo do botão, e os alertas do comedouro continuam no Início (seção 5.5).
+
+- Uma janela no centro, com fundo cartão, borda fina, canto de 12 px e a sombra única. Atrás dela, a tela escurece em tinta (45%), **sem desfoque** (proibição 3).
+- Título em pergunta, com o nome do que vai sumir: "Remover Mingau?". Embaixo, uma frase em tinta suave dizendo o que se perde.
+- Dois botões lado a lado: "Cancelar" (secundário) e o verbo da ação ("Remover", principal). O foco começa em "Cancelar": um Enter sem querer não apaga nada.
+- Fecha com "Cancelar", com a tecla Esc ou tocando fora dela. Enquanto a ação roda, não fecha.
+- Se a ação falhar, o motivo aparece dentro da própria janela.
+- Peça pronta: `ConfirmDialog`, em `web/src/ui.tsx`.
+
 ## 6. Hierarquia
 
 **Toda tela responde primeiro "está tudo bem?", depois oferece a ação, e só então mostra os números.**
