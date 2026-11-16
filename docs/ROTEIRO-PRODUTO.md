@@ -4,7 +4,7 @@
 > Continua o [ROTEIRO-SISTEMA.md](ROTEIRO-SISTEMA.md) (E0–E13). As decisões vieram de um grill em 16/11/2026.
 > **Formato:** o Claude implementa o servidor e o PWA com TDD, uma etapa por vez, com commit e explicação ao fim de cada uma. O firmware (seção 6) é seu, com mentoria no método do [mentoria.md](mentoria.md). Toda tela nova segue o [UI-UX.md](UI-UX.md).
 >
-> **Progresso (16/11/2026):** roteiro escrito; nenhuma etapa começada.
+> **Progresso (16/11/2026):** P1 concluída (falta só você testar com uma conta Google de verdade). 206 testes no servidor e 52 no app.
 
 ---
 
@@ -104,7 +104,7 @@ Todas as rotas (menos login e pareamento) exigem sessão. As rotas de hoje passa
 
 | Etapa | Entrega | Horas | Situação |
 |---|---|---|---|
-| P1 | Contas: login com Google, sessão, dono | 6–8 | ⬜ |
+| P1 | Contas: login com Google, sessão, dono | 6–8 | ✅ Concluída. Falta o teste com o seu Client ID |
 | P2 | Vários comedouros: apelido, rotas por comedouro, broker por aparelho | 8–12 | ⬜ |
 | P3 | Pets | 4–6 | ⬜ |
 | P4 | Pareamento e comedouro simulado | 6–8 | ⬜ |
@@ -116,13 +116,15 @@ Todas as rotas (menos login e pareamento) exigem sessão. As rotas de hoje passa
 
 **Objetivo:** ninguém usa o app sem entrar, e a sessão sobrevive a fechar o navegador.
 
-- [ ] Porta `IdentityVerifier` (confere o token do Google e devolve `sub`, e-mail, nome e foto). Adaptador com `google-auth-library`; um falso nos testes
-- [ ] Agregado `User` e repositório (memória + Mongo, mesma suíte de contrato)
-- [ ] Sessão: token aleatório de 32 bytes no cookie, hash no Mongo, índice TTL, renovação no uso
-- [ ] Rotas `POST /v1/sessao`, `DELETE /v1/sessao`, `GET /v1/eu`; gancho do Fastify que barra as demais sem sessão (401)
-- [ ] "Entrar como dev" fora de produção (D21)
-- [ ] PWA: tela de login (botão do Google, seguindo o UI-UX), tela "Conta" com nome, foto e "Sair"; um 401 em qualquer chamada leva ao login
-- [ ] `.env`: `GOOGLE_CLIENT_ID`, `SESSION_SECRET`; o [GUIA](GUIA.md) ganha o passo a passo do Google Cloud Console
+> ✅ **Concluída em 16/11/2026.** Diferenças: não precisou de `SESSION_SECRET` (o token da sessão é aleatório e o banco guarda só o hash, então não há nada para assinar); entraram `DEV_LOGIN` e `COOKIE_SECURE` no `.env`, para o Docker continuar usável em casa; a "tela Conta" virou o cartão **Ajustes → Sua conta** até o dashboard da P5 existir. O "dono" de cada comedouro chega na P2: por enquanto, toda conta vê o mesmo.
+
+- [x] Porta `IdentityVerifier` (confere o token do Google e devolve `sub`, e-mail, nome e foto). Adaptador com `google-auth-library`; um falso nos testes
+- [x] Agregado `User` e repositório (memória + Mongo, mesma suíte de contrato)
+- [x] Sessão: token aleatório de 32 bytes no cookie, hash no Mongo, índice TTL, renovação no uso
+- [x] Rotas `POST /v1/sessao`, `DELETE /v1/sessao`, `GET /v1/eu`; gancho do Fastify que barra as demais sem sessão (401)
+- [x] "Entrar como dev" fora de produção (D21)
+- [x] PWA: tela de login (botão do Google, seguindo o UI-UX), tela "Conta" com nome, foto e "Sair"; um 401 em qualquer chamada leva ao login
+- [x] `.env`: `GOOGLE_CLIENT_ID` (o `SESSION_SECRET` não foi preciso); o [GUIA](GUIA.md) ganha o passo a passo do Google Cloud Console
 
 **Testes primeiro:** token inválido → 401; primeiro login cria o usuário, o segundo reaproveita; sessão vencida → 401; "Sair" invalida o cookie; rota sem sessão → 401.
 

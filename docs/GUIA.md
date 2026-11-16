@@ -33,7 +33,9 @@ Você precisa do Docker Desktop aberto. Na raiz do repo:
 docker compose up -d --build
 ```
 
-Abra **http://localhost:3000**. O app aparece com a etiqueta "Simulado": um alimentador de mentira roda dentro do servidor. Dá para servir, montar a agenda e ver o histórico. Em **Ajustes → Simulador**, você põe ração na tigela ou esvazia a garrafa para ver as recusas e os avisos acontecerem.
+Antes da primeira vez, crie na raiz do repo um arquivo `.env` com uma linha só: `DEV_LOGIN=true`. Ela liga o botão "Entrar como dev", que dispensa a conta Google (seção 3.5).
+
+Abra **http://localhost:3000** e toque em "Entrar como dev". O app aparece com a etiqueta "Simulado": um alimentador de mentira roda dentro do servidor. Dá para servir, montar a agenda e ver o histórico. Em **Ajustes → Simulador**, você põe ração na tigela ou esvazia a garrafa para ver as recusas e os avisos acontecerem.
 
 Para parar: `docker compose down`. Os dados ficam guardados no volume do MongoDB.
 
@@ -44,7 +46,7 @@ cd web    && pnpm install && pnpm build
 cd server && pnpm install && pnpm dev
 ```
 
-Abra **http://localhost:3000**. Nesse caso, os dados ficam em memória e somem quando o servidor para.
+Abra **http://localhost:3000** e toque em "Entrar como dev" (fora do Docker, ele já vem ligado). Nesse caso, os dados ficam em memória e somem quando o servidor para.
 
 ## 3. Configuração
 
@@ -98,6 +100,39 @@ Não troque as chaves depois: os aparelhos já inscritos param de receber e prec
 | `LOG_LEVEL` | `info` | `debug` mostra mais detalhes; `warn` mostra só os problemas |
 | `SIM_CAT_EATS_MINUTES` | `10` | Só no modo demonstração: em quantos minutos o "gato" esvazia a tigela. `0` desliga |
 
+### 3.5 Login
+
+O app só abre depois de entrar. Há dois jeitos:
+
+- **Com o Google**, o jeito de verdade. Precisa do `GOOGLE_CLIENT_ID`.
+- **"Entrar como dev"**, que dispensa o Google. Serve para desenvolver e para o modo demonstração. Todo mundo que entra assim usa a mesma conta, "Dev".
+
+| Variável | Padrão | O que faz |
+|---|---|---|
+| `GOOGLE_CLIENT_ID` | vazia | O "ID do cliente OAuth" do Google. Sem ele, o botão do Google não aparece |
+| `DEV_LOGIN` | ligado fora do Docker, desligado no Docker | `true` mostra o botão "Entrar como dev". **Nunca ligue num servidor aberto na internet** |
+| `COOKIE_SECURE` | desligado fora do Docker, ligado no Docker | Com `true`, o navegador só manda o cookie da sessão por HTTPS (`localhost` também vale). Desligue só para abrir o app por `http://` com o IP da máquina, na rede de casa |
+
+**Como conseguir o `GOOGLE_CLIENT_ID`** (uma vez só, de graça):
+
+1. Abra o [Google Cloud Console](https://console.cloud.google.com/) e crie um projeto, por exemplo "Comedouro".
+2. Vá em **APIs e serviços → Tela de consentimento OAuth** (em algumas versões do console, **Google Auth Platform**). Escolha o público **Externo**, ponha o nome do app ("Comedouro") e o seu e-mail de suporte.
+3. Enquanto o app estiver "Em teste", só entram as contas listadas em **Usuários de teste**: adicione o seu e-mail ali. Para abrir para qualquer pessoa, publique o app. Como ele só pede nome, e-mail e foto, o Google não exige revisão.
+4. Vá em **Clientes** (ou **Credenciais → Criar credenciais → ID do cliente OAuth**) e escolha **Aplicativo da Web**.
+5. Em **Origens JavaScript autorizadas**, adicione cada endereço de onde você abre o app:
+   - `http://localhost:3000` (Docker e `pnpm dev` do servidor)
+   - `http://localhost:5173` (`pnpm dev` do app)
+   - o endereço HTTPS do Tailscale, se usar (seção 6.1)
+
+   Não precisa de "URI de redirecionamento".
+6. Copie o **ID do cliente** (termina em `.apps.googleusercontent.com`) para o `GOOGLE_CLIENT_ID` do `.env` e recrie o servidor.
+
+O ID do cliente não é segredo: ele aparece no código da página de qualquer jeito. Não existe "chave secreta" neste fluxo, porque quem confere o login é o próprio servidor, com as chaves públicas do Google.
+
+O Google só aceita origens com HTTPS, exceto o `localhost`. Para entrar pelo celular, use o endereço do Tailscale.
+
+A sessão dura 30 dias e se renova sozinha enquanto o app é usado. "Sair" fica em **Ajustes → Sua conta**.
+
 ## 4. Rodar
 
 ### 4.1 Uso normal (Docker)
@@ -144,6 +179,8 @@ Dois terminais:
 cd server && pnpm dev      # API em http://localhost:3000, reinicia a cada mudança
 cd web    && pnpm dev      # app em http://localhost:5173, com a API por proxy
 ```
+
+O app abre na tela de login: toque em "Entrar como dev", que vem ligado fora do Docker.
 
 Para guardar os dados entre reinícios, suba só o banco (`docker compose up -d mongo`) e descomente o `MONGO_URL` no `.env`.
 
@@ -252,6 +289,7 @@ Para instalar o app e receber notificações, o navegador exige **HTTPS**. A for
    ```
 4. Rode `tailscale serve status`: ele mostra o endereço, no formato `https://nome-da-maquina.sua-rede.ts.net`.
 5. Abra esse endereço no celular, com o Tailscale ligado. Funciona em casa e fora, pelo 4G.
+6. Para entrar com o Google por ele, adicione o endereço às origens autorizadas do cliente OAuth (seção 3.5, passo 5).
 
 Se o comando tiver mudado na sua versão, veja `tailscale serve --help`.
 
@@ -312,7 +350,16 @@ O backup não é automático. Se quiser um diário, agende o primeiro comando no
 
 ## 10. A API
 
-O app usa esta API, em `/v1`. Ela não tem login (seção 11).
+O app usa esta API, em `/v1`. Todas as rotas, menos as de `/v1/sessao`, exigem o cookie da sessão; sem ele, a resposta é 401.
+
+| Método e rota | O que faz |
+|---|---|
+| `GET /v1/sessao/opcoes` | Quais botões a tela de login mostra: `{ "google": "<client id>" ou null, "dev": true/false }` |
+| `POST /v1/sessao` | Entra com o Google. Corpo: `{ "credencial": "<ID token do Google>" }`. Devolve o usuário e o cookie `sessao` |
+| `POST /v1/sessao/dev` | "Entrar como dev". Só existe com `DEV_LOGIN` ligado |
+| `DELETE /v1/sessao` | Sai |
+| `GET /v1/eu` | Quem está logado: `{ "id", "nome", "email", "foto" }` |
+
 
 | Método e rota | O que faz |
 |---|---|
@@ -334,6 +381,8 @@ O app usa esta API, em `/v1`. Ela não tem login (seção 11).
 |---|---|
 | 200, 201, 202 | Deu certo. O 202 é do "servir": o pedido foi aceito e está sendo executado |
 | 400 | A forma do dado está errada: campo faltando, tipo errado |
+| 401 | Sem sessão, sessão vencida, ou o Google não confirmou a credencial |
+| 403 | O pedido veio de outro site (proteção contra CSRF) |
 | 409 | O alimentador está ocupado, ou duas edições ao mesmo tempo |
 | 422 | Uma regra recusou. O corpo traz `motivo` e `mensagem` |
 | 429 | O alimentador recusou o pedido de porção. O corpo traz o `motivo` |
@@ -341,7 +390,7 @@ O app usa esta API, em `/v1`. Ela não tem login (seção 11).
 
 ## 11. Limites conhecidos
 
-- **A API não tem login.** Quem alcança a porta 3000 controla o alimentador. Use só na rede de casa e pelo Tailscale. **Nunca abra a porta 3000 nem a 1883 para a internet.**
+- **Toda conta vê o mesmo alimentador.** O login já existe, mas cada usuário só passa a ter os próprios comedouros na etapa P2 do [roteiro do produto](ROTEIRO-PRODUTO.md). Até lá, use só na rede de casa e pelo Tailscale. **Nunca abra a porta 3000 nem a 1883 para a internet.**
 - **O broker MQTT não usa TLS.** A senha passa em texto na rede da casa. Para um servidor na nuvem, seria preciso um broker com TLS.
 - **Não testado com aparelhos de verdade:** a entrega das notificações push num celular, o acesso pelo Tailscale, a instalação no iPhone e a placa ESP32. O código dessas partes existe e tem testes automáticos até onde dá sem os aparelhos; a seção 12 mostra o que foi conferido.
 - **Um alimentador só.** O sistema guarda um alimentador por servidor.
@@ -359,5 +408,6 @@ O app usa esta API, em `/v1`. Ela não tem login (seção 11).
 | MQTT | Testes com um broker de verdade: configuração retida, servir, queda sem aviso, senha errada e histórico completado depois que o servidor volta |
 | O app | Testes da lógica das telas, e conferência visual das quatro telas em tamanho de celular, nos temas claro e escuro |
 | Docker | O compose inteiro, com o simulador conectado de fora e o servidor reiniciado no meio |
+| Login | Testes automáticos (sessão, renovação, saída, 401, CSRF) e o servidor no ar com "Entrar como dev". O login com uma conta Google de verdade ainda não foi feito: depende do `GOOGLE_CLIENT_ID` |
 
-São 166 testes no servidor (14 deles precisam do MongoDB no ar) e 25 no app.
+São 206 testes no servidor (17 deles precisam do MongoDB no ar) e 52 no app.
