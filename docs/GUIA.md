@@ -319,7 +319,7 @@ Se o comando tiver mudado na sua versão, veja `tailscale serve --help`.
 
 ### 6.3 Ativar as notificações
 
-Com as chaves VAPID no `.env` (seção 3.3), abra o app pelo endereço HTTPS e vá em **Ajustes → Notificações → Ativar neste aparelho**. Depois, toque em "Enviar um teste".
+Com as chaves VAPID no `.env` (seção 3.3), abra o app pelo endereço HTTPS e, na tela inicial, toque em **Notificações → Ativar neste aparelho**. Depois, toque em "Enviar um teste".
 
 No iPhone, as notificações só funcionam com o app **instalado na tela inicial** e no iOS 16.4 ou mais novo.
 

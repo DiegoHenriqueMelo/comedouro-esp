@@ -1,7 +1,18 @@
 # Mentoria — como o Claude ensina neste projeto
 
 > Para qualquer sessão do Claude que trabalhe neste repositório, em qualquer computador. Descreve o método que funcionou da E0 à E3, para manter o mesmo padrão entre conversas.
-> Referências: [ROTEIRO-SISTEMA.md](ROTEIRO-SISTEMA.md) (etapas E0–E13), [glossario.md](glossario.md) (termos e regras R1–R14) e [PLANO-DE-ACAO.md](PLANO-DE-ACAO.md) (o projeto inteiro). A fonte desses documentos é a pasta `docs/` deste repo.
+> Referências: [ROTEIRO-PRODUTO.md](ROTEIRO-PRODUTO.md) (a fase atual, P1–P7 e F1–F6), [ROTEIRO-SISTEMA.md](ROTEIRO-SISTEMA.md) (etapas E0–E13), [glossario.md](glossario.md) (termos e regras R1–R14) e [PLANO-DE-ACAO.md](PLANO-DE-ACAO.md) (o projeto inteiro). A fonte desses documentos é a pasta `docs/` deste repo.
+
+## Quem faz o quê, hoje (16/11/2026)
+
+| Parte | Quem escreve | Como |
+|---|---|---|
+| Servidor (`server/`) e PWA (`web/`) | O Claude | Desde 10/11/2026, a pedido do usuário. Uma etapa do [roteiro do produto](ROTEIRO-PRODUTO.md) por vez, com TDD, testes e lint verdes, commits no padrão do repo e o roteiro atualizado no fim |
+| Firmware (`firmware/`), itens F1–F6 | O usuário | Mentoria, no método abaixo. O contrato é o [protocolo-mqtt.md](protocolo-mqtt.md), e o `pnpm simulador` é a referência de comportamento |
+
+O método abaixo nasceu no servidor (E0–E3) e vale para o firmware. Se o usuário pedir para **aprender** uma parte do servidor, ele volta a valer lá também.
+
+Pedidos que mudam o rumo, como "interrompa" ou "faça por mim", valem para aquele pedido, não para sempre.
 
 ## Quem está aprendendo
 
@@ -65,7 +76,7 @@ Quando o usuário travar, não insista no mesmo formato: mostre o caso pronto.
 
 ## Formato da revisão
 
-1. Antes de afirmar qualquer coisa, rodar dentro de `server/`: `pnpm vitest run`, `pnpm typecheck` e `pnpm lint`.
+1. Antes de afirmar qualquer coisa, rodar os testes, os tipos e o lint da parte revisada: `pnpm vitest run`, `pnpm typecheck` e `pnpm lint` em `server/` ou em `web/`; `pio test` e `pio run` em `firmware/`.
 2. Tabela de critérios com ✅ ou ❌ e o resultado real de cada comando.
 3. **O que está certo**, em uma ou duas linhas, antes dos problemas.
 4. Problemas numerados, do mais grave ao menor: o que é, por que importa e como corrigir, ou qual teste pega. Sem reescrever o código do usuário.
@@ -76,7 +87,7 @@ Quando o usuário travar, não insista no mesmo formato: mostre o caso pronto.
 
 1. Na branch `develop`: `git fetch`, `git status -sb` e `git log --oneline -10`. O usuário também programa em outro computador, então confira se a branch local está atrás da remota antes de mexer em qualquer coisa.
 2. Rodar os três comandos da revisão.
-3. Descobrir a etapa pelo código e pela seção 5 do roteiro.
+3. Descobrir a etapa pelo código e pelo roteiro: a tabela de etapas do [roteiro do produto](ROTEIRO-PRODUTO.md) (seção 4) e a da parte do firmware (seção 6).
 4. Dizer em poucas linhas onde parou e o que falta, e propor o próximo passo.
 
 ## Convenções do código

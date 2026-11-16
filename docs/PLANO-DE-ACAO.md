@@ -4,7 +4,7 @@
 > Estrutura inspirada no tutorial [Como fazer um alimentador automático com Arduino](https://www.makerhero.com/blog/alimentador-automatico-com-arduino/), da MakerHero, com a comporta trocada por uma comporta dosadora.
 > Modelo 3D (versão revestida, com balança e sensor de nível): https://claude.ai/artifact/6WYF1TqG1M9dxTngaVKYsh
 > Plano reescrito em 29/10/2026. A versão anterior, com rotor e motor de passo, está em [arquivo/PLANO-DE-ACAO-v1-rotor.md](arquivo/PLANO-DE-ACAO-v1-rotor.md).
-> Desde 30/10/2026, o servidor, o banco e o PWA têm uma trilha própria: [ROTEIRO-SISTEMA.md](ROTEIRO-SISTEMA.md).
+> Desde 30/10/2026, o servidor, o banco e o PWA têm uma trilha própria: [ROTEIRO-SISTEMA.md](ROTEIRO-SISTEMA.md). Desde 16/11/2026, a fase de produto (contas, vários comedouros, pareamento, nuvem) está no [ROTEIRO-PRODUTO.md](ROTEIRO-PRODUTO.md), com a parte do firmware na seção 6 dele.
 
 ---
 
@@ -49,7 +49,7 @@
 | D3 | Atuador | Servo **MG996R de 180°**, 5 V | Sabe a própria posição: sem driver e sem sensor. Engrenagem de metal, com força para cortar um grão preso |
 | D4 | Sensores de segurança | **Balança na tigela** (célula de carga de 5 kg + HX711) e **sensor de nível** na tampa (VL53L1X) | A balança impede servir com a tigela cheia e confirma que a porção saiu; o nível avisa antes de acabar |
 | D5 | Energia | Fonte de tomada 5 V / 3 A com selo do Inmetro, plugue P4, adaptador com borne e capacitor de 1000 µF. O cabo de 5 V entra por trás do pedestal, num protetor espiral | A parte de 127/220 V fica na tomada, fora do alcance do gato e fora da caixa impressa. Se o gato morder o cabo, são 5 V: sem risco de choque |
-| D6 | Rede | Wi-Fi local. O ESP32 abre a conexão com o servidor; de fora de casa, o acesso é pelo PWA, via Tailscale ou nuvem (decidir na E13 do roteiro) | Sem porta aberta no roteador |
+| D6 | Rede | Wi-Fi local. O ESP32 abre a conexão com o servidor. Decidido em 16/11/2026: o servidor vai para uma VPS na nuvem, com HTTPS e MQTT com TLS (etapa P7 do [roteiro do produto](ROTEIRO-PRODUTO.md)); até lá, em casa, com Tailscale | Sem porta aberta no roteador da casa |
 | D7 | Alexa | Espalexa local (emula Philips Hue) | 100% local e gratuito; só precisa de "servir agora" |
 | D8 | Segurança do gato | Limite diário + intervalo mínimo, aplicados no firmware | Nenhum cliente (servidor, interface, Alexa, bug) consegue burlar |
 | D9 | Relógio | Só NTP, sem módulo RTC | O ESP32 guarda a hora enquanto está ligado. Sem hora, a agenda espera, e a refeição perdida em até 2 h é servida quando a hora volta |
@@ -77,7 +77,7 @@
                  │  /v1/* (API REST JSON) + PWA        MongoDB      │
                  │  configuração, histórico longo, avisos           │
                  └───────────────────────┬─────────────────────────┘
-                                         │ MQTT (Mosquitto): o ESP32 abre a conexão
+                                         │ MQTT (broker dentro do servidor): o ESP32 abre a conexão
                  ┌──────────────── Wi-Fi da casa ──────────────────┐
   Echo Dot ──────┤   ESP32  ── agenda, limites, tigela (decide)    │
   (Hue local)    │          ── /api, /description.xml (Espalexa)   │
@@ -276,7 +276,7 @@ Fuso horário do Brasil (sem horário de verão desde 2019): `"<-03>3"` no forma
 | Hora da última refeição, tara e fator da balança | NVS | Precisam sobreviver a uma queda de luz |
 | Histórico | LittleFS no ESP32, JSON Lines com buffer circular (~500 linhas), e MongoDB no servidor | O local cobre o período sem servidor e é reenviado depois; o servidor guarda tudo |
 | Interface web | Servidor Fastify | O ESP32 não serve mais a interface |
-| Senha do Wi-Fi, endereço e senha do broker MQTT | Guardados pela WiFiManager e na NVS | Nunca no código nem no git |
+| Senha do Wi-Fi, endereço do servidor e a credencial MQTT que veio do pareamento | Guardados pela WiFiManager e na NVS | Nunca no código nem no git |
 | Senhas e chaves do servidor | Variáveis de ambiente | Nunca no git |
 
 ### 3.7 Módulos do firmware
@@ -787,7 +787,8 @@ Depende da E9 do roteiro do sistema: é lá que o protocolo MQTT fica fechado.
 **Objetivo:** o ESP32 configurado sem senha no código e conversando com o servidor.
 
 - [ ] Trocar o `secrets.h` pela WiFiManager: sem rede salva, o ESP32 cria a rede "Alimentador-Setup". No ambiente `wokwi`, pular essa etapa.
-- [ ] No portal da WiFiManager, campos extras para o endereço, o usuário e a senha do broker MQTT, salvos na NVS.
+- [ ] No portal da WiFiManager, campos extras para o endereço do servidor e o **código de pareamento**. O ESP32 troca o código pelo usuário e pela senha MQTT e guarda os dois na NVS (itens F2 e F3 do [roteiro do produto](ROTEIRO-PRODUTO.md); contrato no [protocolo](protocolo-mqtt.md), seção Pareamento).
+- [ ] Broker recusou a senha (comedouro removido, ou pareado em outro aparelho) ou botão de reset apertado por 10 s: apagar a credencial e voltar ao portal (F6).
 - [ ] Rodar a WiFiManager **antes** de subir o servidor do Espalexa.
 - [ ] Cliente MQTT seguindo o `docs/protocolo-mqtt.md`: aplicar a configuração retida e devolver a versão no estado, receber comandos, publicar eventos com `seq` e o estado, e registrar o last will.
 - [ ] O comando `servir` do MQTT passa pelo `requestDispense`, como a agenda e a Alexa.
@@ -889,7 +890,7 @@ Cada item entra só se o uso mostrar que faz falta.
 ```
 dispenser/
 ├── README.md
-├── docker-compose.yml  # MongoDB e Mosquitto (roteiro do sistema)
+├── docker-compose.yml  # MongoDB e o servidor (com o broker MQTT embutido)
 ├── firmware/      # PlatformIO (seção 3.7), com wokwi.toml e diagram.json
 ├── server/        # Fastify + DDD (roteiro do sistema)
 ├── web/           # PWA React + Vite + TS; o build é servido pelo server
@@ -941,6 +942,7 @@ dispenser/
 | 29/10/2026 | Versão revestida: capa estilo cafeteira, pedestal com a eletrônica, tigela a ~10 cm do chão, sem fio exposto (cabo de 5 V num protetor espiral). Segurança com balança na tigela (HX711) e sensor de nível na tampa (VL53L1X). Comporta passa a girar 60°. Lista de compras e custos atualizados. |
 | 29/10/2026 | Nova seção 4.6 com os links de compra de cada item, o preço visto e o que conferir no anúncio, e a ordem de compra sugerida. |
 | 30/10/2026 | Entra um servidor Fastify + MongoDB com DDD (D18), como companheiro do ESP32, que continua decidindo sozinho. Conversa por MQTT (D19). O PWA sai do LittleFS e passa a ser servido pelo servidor, com HTTPS (D11); a API `/v1` também vai para o servidor. Avisos por notificação push, com o Telegram em espera (D13, M8). M6 reescrito e M7 movido para o novo [roteiro do sistema](ROTEIRO-SISTEMA.md). |
+| 16/11/2026 | Começa a fase de produto ([roteiro do produto](ROTEIRO-PRODUTO.md)): login com o Google, vários comedouros e pets por conta, pareamento do ESP32 por código de 6 dígitos e, no fim, servidor na nuvem (D6). O M6 passa a pedir o código de pareamento no portal, no lugar do usuário e da senha do broker. |
 | 12/11/2026 | O servidor e o PWA ficaram prontos (etapas E0 a E10 do roteiro; E11 a E13 dependem de passos no celular e na rede). O broker MQTT passou a rodar dentro do servidor (D19), o contrato com o firmware está em [protocolo-mqtt.md](protocolo-mqtt.md), e a biblioteca MQTT sugerida para o firmware mudou para uma que publica em QoS 1. Para instalar e usar, veja o [guia](GUIA.md). |
 | 04/11/2026 | Nova seção 3.4.1 com o cálculo de tensão e corrente do modelo de garrafa: consumo de cada peça, calor no regulador, queda nos fios, capacitor e gasto de energia. Medição de tensão acrescentada ao M3. |
 | 04/11/2026 | Nova seção 5.2 com o cálculo mecânico: estresse na coluna e no braço, flexão, servo contra grão preso, célula de carga e tombamento. Folga garganta–comporta passa a 1 mm, batentes da balança reguláveis, e entram a cantoneira na parede e o risco de tombar como Alto. |

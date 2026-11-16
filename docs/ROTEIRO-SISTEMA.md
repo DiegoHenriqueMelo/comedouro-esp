@@ -4,7 +4,9 @@
 > Complementa o [PLANO-DE-ACAO.md](PLANO-DE-ACAO.md). Começada em 30/10/2026. A fase seguinte (contas, vários comedouros e nuvem) está no [ROTEIRO-PRODUTO.md](ROTEIRO-PRODUTO.md).
 > **Formato:** mentoria com TDD. Você escreve os testes e o código; o Claude explica o conceito, define o que testar e revisa. O método está em [mentoria.md](mentoria.md). A mentoria valeu da E0 até a metade da E3. Em 10/11/2026, a pedido do usuário, o Claude implementou o restante.
 >
-> **Progresso (12/11/2026):** E0 a E10 concluídas. E11, E12 e E13 têm o código pronto e dependem de passos seus: HTTPS com Tailscale, teste da notificação no celular, IP reservado e backup agendado. São 166 testes no servidor e 25 no app. Para instalar e usar, veja o [guia](GUIA.md).
+> **Progresso (12/11/2026):** E0 a E10 concluídas. E11, E12 e E13 têm o código pronto e dependem de passos seus: HTTPS com Tailscale, teste da notificação no celular, IP reservado e backup agendado. Para instalar e usar, veja o [guia](GUIA.md).
+>
+> **Este roteiro está fechado.** Desde 16/11/2026, o trabalho segue no [roteiro do produto](ROTEIRO-PRODUTO.md), que mudou parte do que está aqui: login com o Google, vários comedouros por conta, pareamento por código, e a saída do `MQTT_URL` e do `FEEDER_ID`. O que vale hoje está no [guia](GUIA.md) e no [protocolo](protocolo-mqtt.md).
 
 ---
 
@@ -309,7 +311,7 @@ Nenhuma etapa precisa de peça: o roteiro inteiro roda no PC, em paralelo ao har
 
 **Conceito:** publicar e assinar (pub/sub), broker, QoS 0 e 1, mensagem retida, last will (LWT) e sessão persistente. Pedido e resposta sobre MQTT, com um `id` de correlação e um prazo.
 
-- [x] Mosquitto no `docker-compose.yml`, com usuário e senha — **trocado:** broker embutido no servidor (aedes), com usuário e senha; um Mosquitto externo ainda funciona pelo `MQTT_URL`
+- [x] Mosquitto no `docker-compose.yml`, com usuário e senha — **trocado:** broker embutido no servidor (aedes), com usuário e senha; um Mosquitto externo funcionava pelo `MQTT_URL` até a P2 do roteiro do produto, quando saiu
 - [x] Fechar o contrato de tópicos (proposta abaixo) em `docs/protocolo-mqtt.md`. É ele que o firmware segue no M6
 - [x] `MqttDispositivo` implementando a mesma porta da E7, sem mudar nenhum teste do `ServirAgora`
 - [x] Simulador como processo separado (`pnpm simulador`), conectado ao Mosquitto como se fosse o ESP32 e reaproveitando as regras do `DispositivoSimulado`. Ele roda a agenda sozinho, manda eventos com `seq` e publica o estado de tempos em tempos. Uma opção de relógio acelerado ajuda nos testes — o relógio acelerado não foi feito
@@ -408,4 +410,5 @@ Nenhuma etapa precisa de peça: o roteiro inteiro roda no PC, em paralelo ao har
 |---|---|
 | 30/10/2026 | Roteiro criado: servidor Fastify com DDD e MongoDB como companheiro do ESP32, que continua autônomo; MQTT entre os dois; PWA servido pelo servidor. Formato de mentoria com TDD. |
 | 03/11/2026 | Progresso marcado: E0 a E2 concluídas e E3 em andamento (R1 e R2 prontas). A S9 passou a refletir os nomes em inglês no código. O método de mentoria foi para o [mentoria.md](mentoria.md). |
+| 16/11/2026 | Roteiro fechado: o trabalho segue no [roteiro do produto](ROTEIRO-PRODUTO.md). |
 | 12/11/2026 | A pedido do usuário, o Claude implementou o restante do sistema: o fim da E3 e as etapas E4 a E13. Diferenças em relação ao roteiro: broker MQTT embutido no servidor no lugar do Mosquitto, sem o pacote `contratos`, e Zod direto nas rotas. Entraram o [guia de uso e configuração](GUIA.md) e o [protocolo MQTT](protocolo-mqtt.md). |

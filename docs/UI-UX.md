@@ -306,10 +306,10 @@ Regras:
 
 ### 9.2 O que ainda falta
 
-- **Validar as telas refeitas** em 16/11/2026, num celular de verdade. As cores foram conferidas por cálculo de contraste e em capturas de 390 px, mas ainda não num aparelho.
+- **Validar num celular de verdade** as telas de 16/11/2026: as quatro de cada comedouro, o login, a tela inicial (comedouros, pets e conta), o cadastro do pet, o código de pareamento e a confirmação em pop-up. As cores foram conferidas por cálculo de contraste e em capturas de 390 px, mas ainda não num aparelho.
 - **A Figtree** foi a proposta para "uma sans humanista" e já está embutida no app. Se preferir outra do mesmo estilo, troque aqui e em `web/src/main.tsx`.
 
-Já feito em 16/11/2026: as quatro telas, a frase de situação no topo da tela inicial, a fonte embutida, a tela de login e a lista de comedouros. O campo "nome do gato" saiu na P2, trocado pelo apelido do comedouro.
+Já feito em 16/11/2026: as quatro telas, a frase de situação no topo da tela inicial, a fonte embutida, a tela de login, a lista de comedouros, os pets, o código de pareamento e a confirmação em pop-up (5.13). O campo "nome do gato" saiu na P2, trocado pelo apelido do comedouro.
 
 ## 10. Antes de entregar uma tela
 
