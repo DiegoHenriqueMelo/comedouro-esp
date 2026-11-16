@@ -5,6 +5,7 @@ import { FeedersPage } from "./pages/FeedersPage";
 import { HistoryPage } from "./pages/HistoryPage";
 import { HomePage } from "./pages/HomePage";
 import { LoginPage } from "./pages/LoginPage";
+import { PetPage } from "./pages/PetPage";
 import { SchedulePage } from "./pages/SchedulePage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { feederPath, navigate, type Route, TABS, useRoute } from "./router";
@@ -58,6 +59,18 @@ function SignedInApp(props: { user: User }) {
     </Notice>
   );
 
+  if (route.name === "pet") {
+    return (
+      <div className="app">
+        <main className="page page-no-tabs">
+          <BackButton />
+          {offline}
+          <PetPage key={route.id ?? "novo"} id={route.id} />
+        </main>
+      </div>
+    );
+  }
+
   if (route.name === "comedouros") {
     return (
       <div className="app">
@@ -72,10 +85,7 @@ function SignedInApp(props: { user: User }) {
   return (
     <div className="app">
       <main className="page">
-        <button type="button" className="back" onClick={() => navigate("/")}>
-          <Icon name="voltar" />
-          Comedouros
-        </button>
+        <BackButton />
         {offline}
         <FeederScreen route={route} />
       </main>
@@ -95,6 +105,15 @@ function SignedInApp(props: { user: User }) {
         ))}
       </nav>
     </div>
+  );
+}
+
+function BackButton() {
+  return (
+    <button type="button" className="back" onClick={() => navigate("/")}>
+      <Icon name="voltar" />
+      Comedouros
+    </button>
   );
 }
 

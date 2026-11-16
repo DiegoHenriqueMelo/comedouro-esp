@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 //   /                                → a lista de comedouros
 //   /comedouros/<id>                 → o início daquele comedouro
 //   /comedouros/<id>/<aba>           → agenda, histórico ou ajustes
+//   /pets/novo · /pets/<id>          → cadastro de um pet
 
 export const TABS = [
   { id: "inicio", label: "Início" },
@@ -16,12 +17,17 @@ export type TabId = (typeof TABS)[number]["id"];
 
 export type Route =
   | { name: "comedouros" }
-  | { name: "comedouro"; id: string; tab: TabId };
+  | { name: "comedouro"; id: string; tab: TabId }
+  // id null: cadastro de um pet novo.
+  | { name: "pet"; id: string | null };
 
 const NAVIGATED = "comedouro:navegou";
 
 export function parseRoute(pathname: string): Route {
   const [first, id, tab] = pathname.split("/").filter(Boolean);
+  if (first === "pets" && id) {
+    return { name: "pet", id: id === "novo" ? null : decodeURIComponent(id) };
+  }
   if (first === "comedouros" && id) {
     const valid = TABS.find((t) => t.id === tab)?.id ?? "inicio";
     return { name: "comedouro", id: decodeURIComponent(id), tab: valid };
@@ -32,6 +38,10 @@ export function parseRoute(pathname: string): Route {
 export function feederPath(id: string, tab: TabId = "inicio"): string {
   const base = `/comedouros/${encodeURIComponent(id)}`;
   return tab === "inicio" ? base : `${base}/${tab}`;
+}
+
+export function petPath(id: string | null): string {
+  return id === null ? "/pets/novo" : `/pets/${encodeURIComponent(id)}`;
 }
 
 export function navigate(path: string): void {

@@ -29,7 +29,15 @@ const MOTIVOS: Record<string, string> = {
   limite_de_simulados: "Cada conta tem só um comedouro simulado.",
   aparelho_indisponivel:
     "Este servidor ainda não aceita aparelhos: falta ligar o broker MQTT.",
-  nao_encontrado: "Este comedouro não existe mais, ou é de outra conta.",
+  nao_encontrado: "Não encontrado: pode ter sido removido.",
+  // pets
+  nome_do_pet_invalido: "O nome precisa ter de 1 a 30 letras.",
+  especie_invalida: "Escolha gato ou cachorro.",
+  nascimento_invalido: "O nascimento precisa ser uma data até hoje.",
+  peso_invalido: "O peso vai de 0,1 a 100 kg.",
+  limite_de_pets: "Cada conta tem no máximo 20 pets.",
+  foto_invalida: "Use uma foto JPEG, PNG ou WebP.",
+  grande_demais: "A foto ficou grande demais. Tente outra.",
   angulos_invalidos:
     "Os ângulos vão de 0° a 180° e precisam ser diferentes entre si.",
   conflito_de_versao:
@@ -77,6 +85,12 @@ export function toneFor(error: unknown): "warn" | "bad" {
 
 const CAMPOS: Record<string, string> = {
   apelido_invalido: "apelido",
+  nome_do_pet_invalido: "nome",
+  especie_invalida: "especie",
+  nascimento_invalido: "nascimento",
+  peso_invalido: "pesoKg",
+  foto_invalida: "foto",
+  grande_demais: "foto",
   gramas_por_porcao_invalido: "gramasPorPorcao",
   limite_diario_invalido: "limiteDiarioPorcoes",
   agenda_acima_do_limite: "limiteDiarioPorcoes",
@@ -293,4 +307,39 @@ export function activePortions(
   agenda: { porcoes: number; ativo: boolean }[],
 ): number {
   return agenda.filter((m) => m.ativo).reduce((sum, m) => sum + m.porcoes, 0);
+}
+
+// A idade a partir do nascimento (AAAA-MM-DD): "2 anos e 3 meses", "5 meses", "menos de 1 mês".
+export function petAge(birth: string, now: Date = new Date()): string {
+  const [y, mo, d] = birth.split("-").map(Number);
+  if (!y || !mo || !d) return "";
+  let months = (now.getFullYear() - y) * 12 + (now.getMonth() + 1 - mo);
+  if (now.getDate() < d) months -= 1;
+  if (months < 1) return "menos de 1 mês";
+  const years = Math.floor(months / 12);
+  const rest = months % 12;
+  const yearText = years === 1 ? "1 ano" : `${years} anos`;
+  const monthText = rest === 1 ? "1 mês" : `${rest} meses`;
+  if (years === 0) return monthText;
+  return rest === 0 ? yearText : `${yearText} e ${monthText}`;
+}
+
+export function formatKg(kg: number): string {
+  return `${kg.toLocaleString("pt-BR", { maximumFractionDigits: 2 })} kg`;
+}
+
+const ESPECIES: Record<string, string> = { gato: "Gato", cachorro: "Cachorro" };
+
+// A legenda de um pet na lista: "Gato · 3 anos · 4,2 kg".
+export function petLine(
+  pet: { especie: string; nascimento: string | null; pesoKg: number | null },
+  now: Date = new Date(),
+): string {
+  return [
+    ESPECIES[pet.especie] ?? pet.especie,
+    pet.nascimento ? petAge(pet.nascimento, now) : null,
+    pet.pesoKg === null ? null : formatKg(pet.pesoKg),
+  ]
+    .filter(Boolean)
+    .join(" · ");
 }

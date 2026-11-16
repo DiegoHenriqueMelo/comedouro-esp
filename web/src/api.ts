@@ -27,6 +27,22 @@ export type FeederSummary = {
   alertas: number;
 };
 
+export type Species = "gato" | "cachorro";
+
+export type Pet = {
+  id: string;
+  nome: string;
+  especie: Species;
+  // AAAA-MM-DD
+  nascimento: string | null;
+  pesoKg: number | null;
+  // O endereço da foto (já com o ?v= da versão), ou null.
+  foto: string | null;
+  criadoEm: string;
+};
+
+export type PetInput = Omit<Pet, "id" | "foto" | "criadoEm">;
+
 // O usuário e a senha MQTT de um aparelho novo: o servidor mostra uma vez só.
 export type DeviceCredential = { usuario: string; senha: string };
 
@@ -108,17 +124,19 @@ async function request<T>(
   path: string,
   body?: unknown,
 ): Promise<T> {
-  let response: Response;
-  try {
-    response = await fetch(`/v1${path}`, {
-      method,
-      ...(body === undefined
-        ? {}
+  // Uma imagem vai como ela mesma; o resto, como JSON.
+  const init: RequestInit =
+    body === undefined
+      ? {}
+      : body instanceof Blob
+        ? { headers: { "Content-Type": body.type }, body }
         : {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(body),
-          }),
-    });
+          };
+  let response: Response;
+  try {
+    response = await fetch(`/v1${path}`, { method, ...init });
   } catch {
     throw new ApiError(0, "sem_conexao");
   }
@@ -138,6 +156,7 @@ async function request<T>(
 }
 
 const feeder = (id: string) => `/comedouros/${encodeURIComponent(id)}`;
+const pet = (id: string) => `/pets/${encodeURIComponent(id)}`;
 
 export const api = {
   loginOptions: () => request<LoginOptions>("GET", "/sessao/opcoes"),
@@ -214,6 +233,17 @@ export const api = {
       nivel?: boolean;
     },
   ) => request<unknown>("POST", `${feeder(id)}/simulador`, changes),
+
+  // Os pets da conta.
+  pets: () => request<Pet[]>("GET", "/pets"),
+  pet: (id: string) => request<Pet>("GET", pet(id)),
+  createPet: (input: PetInput) => request<Pet>("POST", "/pets", input),
+  updatePet: (id: string, input: PetInput) =>
+    request<Pet>("PUT", pet(id), input),
+  removePet: (id: string) => request<null>("DELETE", pet(id)),
+  uploadPetPhoto: (id: string, photo: Blob) =>
+    request<Pet>("PUT", `${pet(id)}/foto`, photo),
+  removePetPhoto: (id: string) => request<Pet>("DELETE", `${pet(id)}/foto`),
 
   // Notificações: são da conta, não de um comedouro.
   pushPublicKey: () =>

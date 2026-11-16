@@ -174,6 +174,12 @@ const ICONS = {
     </>
   ),
   voltar: <path d="M14.5 6 8.5 12l6 6" />,
+  foto: (
+    <>
+      <path d="M4 8.5h3l1.5-2h7L17 8.5h3V18H4z" />
+      <circle cx="12" cy="13" r="3" />
+    </>
+  ),
   seguir: <path d="M9.5 6l6 6-6 6" />,
 } as const;
 

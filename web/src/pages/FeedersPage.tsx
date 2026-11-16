@@ -7,8 +7,8 @@ import {
   type User,
 } from "../api";
 import { type Tone, useAction, useLoad } from "../hooks";
-import { fieldFor, messageFor } from "../messages";
-import { feederPath, navigate } from "../router";
+import { fieldFor, messageFor, petLine } from "../messages";
+import { feederPath, navigate, petPath } from "../router";
 import {
   Card,
   FeedbackLine,
@@ -20,6 +20,7 @@ import {
   StateLine,
 } from "../ui";
 import { Account, Notifications } from "./AccountCards";
+import { PetAvatar } from "./PetPage";
 
 // A primeira tela depois do login: os comedouros da conta. Tocar num deles abre as telas dele.
 export function FeedersPage(props: { user: User }) {
@@ -106,9 +107,57 @@ export function FeedersPage(props: { user: User }) {
         </button>
       )}
 
+      <Pets />
       <Notifications />
       <Account user={props.user} />
     </>
+  );
+}
+
+// Os pets da conta: só cadastro, sem ligação com os comedouros (D5).
+function Pets() {
+  const pets = useLoad(api.pets);
+
+  return (
+    <Card title="Pets">
+      {pets.loading && <Loading />}
+      {!pets.loading && !pets.data && (
+        <LoadError
+          message={messageFor(pets.error)}
+          onRetry={() => void pets.reload()}
+        />
+      )}
+      {pets.data?.length === 0 && (
+        <p className="legend">Nenhum pet cadastrado.</p>
+      )}
+      {pets.data && pets.data.length > 0 && (
+        <ul className="list">
+          {pets.data.map((pet) => (
+            <li key={pet.id} className="list-item">
+              <button
+                type="button"
+                className="feeder-item"
+                onClick={() => navigate(petPath(pet.id))}
+              >
+                <PetAvatar name={pet.nome} src={pet.foto} />
+                <span className="list-text">
+                  <span className="feeder-name">{pet.nome}</span>
+                  <span className="legend">{petLine(pet)}</span>
+                </span>
+                <Icon name="seguir" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <button
+        type="button"
+        className="button"
+        onClick={() => navigate(petPath(null))}
+      >
+        Adicionar pet
+      </button>
+    </Card>
   );
 }
 
