@@ -4,7 +4,7 @@
 > Continua o [ROTEIRO-SISTEMA.md](ROTEIRO-SISTEMA.md) (E0–E13). As decisões vieram de um grill em 16/11/2026.
 > **Formato:** o Claude implementa o servidor e o PWA com TDD, uma etapa por vez, com commit e explicação ao fim de cada uma. O firmware (seção 6) é seu, com mentoria no método do [mentoria.md](mentoria.md). Toda tela nova segue o [UI-UX.md](UI-UX.md).
 >
-> **Progresso (16/11/2026):** P1 e P2 concluídas (da P1, falta só você testar com uma conta Google de verdade). 255 testes no servidor e 63 no app.
+> **Progresso (16/11/2026):** P1, P2 e P3 concluídas (da P1, falta só você testar com uma conta Google de verdade). 292 testes no servidor e 73 no app.
 
 ---
 
@@ -106,7 +106,7 @@ Todas as rotas (menos login e pareamento) exigem sessão. As rotas de hoje passa
 |---|---|---|---|
 | P1 | Contas: login com Google, sessão, dono | 6–8 | ✅ Concluída. Falta o teste com o seu Client ID |
 | P2 | Vários comedouros: apelido, rotas por comedouro, broker por aparelho | 8–12 | ✅ Concluída |
-| P3 | Pets | 4–6 | ⬜ |
+| P3 | Pets | 4–6 | ✅ Concluída |
 | P4 | Pareamento e comedouro simulado | 6–8 | ⬜ |
 | P5 | Dashboard, previsão, pausa e copiar agenda | 6–10 | ⬜ |
 | P6 | Excluir conta e dados | 2–3 | ⬜ |
@@ -157,10 +157,12 @@ Todas as rotas (menos login e pareamento) exigem sessão. As rotas de hoje passa
 
 ### P3 — Pets · 4–6 h
 
-- [ ] Agregado `Pet` com as regras da tabela 3.1; repositório com suíte de contrato
-- [ ] Rotas `/v1/pets` com o mesmo cuidado de dono
-- [ ] PWA: lista de pets e formulário (nome, espécie, nascimento, peso, foto). A foto é reduzida no próprio celular antes de enviar (D13)
-- [ ] Idade calculada na tela ("2 anos e 3 meses"), não guardada
+> ✅ **Concluída em 16/11/2026.** Diferenças: a foto tem rota própria (`PUT /v1/pets/:id/foto`, com a imagem crua no corpo) e fica numa coleção separada (`pet_photos`), para a lista de pets não carregar imagens; o servidor confere os primeiros bytes de cada formato (JPEG, PNG, WebP). O `?v=` no endereço da foto deixa o navegador guardá-la sem mostrar uma antiga. Os pets aparecem num cartão "Pets" na tela inicial, abaixo dos comedouros.
+
+- [x] Agregado `Pet` com as regras da tabela 3.1; repositório com suíte de contrato
+- [x] Rotas `/v1/pets` com o mesmo cuidado de dono
+- [x] PWA: lista de pets e formulário (nome, espécie, nascimento, peso, foto). A foto é reduzida no próprio celular antes de enviar (D13)
+- [x] Idade calculada na tela ("2 anos e 3 meses"), não guardada
 
 **Testes primeiro:** nome vazio ou com mais de 30 letras → 422; nascimento no futuro → 422; peso fora da faixa → 422; foto acima do limite → 413; pet de outra conta → 404; 21º pet → 422.
 

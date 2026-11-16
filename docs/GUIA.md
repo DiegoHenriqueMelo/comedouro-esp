@@ -202,7 +202,9 @@ Os testes dos repositórios do MongoDB só rodam com o banco no ar (`docker comp
 
 ### 5.0 Comedouros
 
-A primeira tela depois de entrar. Cada comedouro aparece com o apelido e o estado em palavras ("Tudo certo", "1 aviso", "Offline"); tocar num deles abre as quatro telas abaixo. Embaixo, **Adicionar comedouro**, **Notificações** (deste aparelho) e **Sua conta** (com o "Sair"). Nas telas de um comedouro, o "‹ Comedouros", no topo, volta para cá.
+A primeira tela depois de entrar. Cada comedouro aparece com o apelido e o estado em palavras ("Tudo certo", "1 aviso", "Offline"); tocar num deles abre as quatro telas abaixo. Embaixo, **Adicionar comedouro**, **Pets**, **Notificações** (deste aparelho) e **Sua conta** (com o "Sair").
+
+**Pets:** cada pet tem nome, espécie (gato ou cachorro), nascimento e peso, os dois opcionais, e uma foto. A foto é reduzida no próprio celular para 512 px antes de subir. A idade aparece calculada ("3 anos e 6 meses"). O pet é só um cadastro: ele não fica ligado a um comedouro, porque o comedouro não sabe quem comeu. Cada conta tem até 20 pets. Nas telas de um comedouro, o "‹ Comedouros", no topo, volta para cá.
 
 ### 5.1 Início
 
@@ -377,6 +379,10 @@ O app usa esta API, em `/v1`. Todas as rotas, menos as de `/v1/sessao`, exigem o
 | `POST /v1/comedouros` | Cria um. Corpo: `{ "apelido": "Cozinha", "tipo": "simulado" }` ou `"aparelho"`. Para aparelho, devolve `credencial: { usuario, senha }` uma vez só |
 | `PATCH /v1/comedouros/:id` | Troca o apelido. Corpo: `{ "apelido": "Sala" }` |
 | `DELETE /v1/comedouros/:id` | Remove o comedouro e todos os dados dele, e apaga a credencial do aparelho |
+| `GET /v1/pets` · `POST /v1/pets` | Lista ou cadastra pets. Corpo: `{ "nome": "Mingau", "especie": "gato", "nascimento": "2023-05-10", "pesoKg": 4.2 }`; nascimento e peso podem ser `null` |
+| `GET` · `PUT` · `DELETE /v1/pets/:id` | Lê, edita ou remove um pet (a foto vai junto) |
+| `PUT /v1/pets/:id/foto` | Envia a foto: o corpo é a própria imagem, com `Content-Type: image/jpeg`, `image/png` ou `image/webp`, até 150 KB |
+| `GET` · `DELETE /v1/pets/:id/foto` | Mostra ou apaga a foto. O pet traz o endereço dela em `foto`, com um `?v=` que muda a cada foto nova |
 | `GET /v1/push/public-key` · `POST /v1/push/subscribe` · `POST /v1/push/unsubscribe` · `POST /v1/push/test` | Notificações deste aparelho, ligadas à conta |
 
 As rotas abaixo são de um comedouro e começam com `/v1/comedouros/:id`. Comedouro de outra conta responde 404, igual a um que não existe.
@@ -402,7 +408,9 @@ As rotas abaixo são de um comedouro e começam com `/v1/comedouros/:id`. Comedo
 | 400 | A forma do dado está errada: campo faltando, tipo errado |
 | 401 | Sem sessão, sessão vencida, ou o Google não confirmou a credencial |
 | 403 | O pedido veio de outro site (proteção contra CSRF) |
-| 404 | O comedouro não existe, ou é de outra conta |
+| 404 | O comedouro ou o pet não existe, ou é de outra conta |
+| 413 | A foto passou de 150 KB |
+| 415 | A foto não é JPEG, PNG nem WebP |
 | 409 | O alimentador está ocupado, ou duas edições ao mesmo tempo |
 | 422 | Uma regra recusou. O corpo traz `motivo` e `mensagem` |
 | 429 | O alimentador recusou o pedido de porção. O corpo traz o `motivo` |
@@ -429,6 +437,7 @@ As rotas abaixo são de um comedouro e começam com `/v1/comedouros/:id`. Comedo
 | O app | Testes da lógica das telas, e conferência visual das quatro telas em tamanho de celular, nos temas claro e escuro |
 | Docker | O compose inteiro, com o simulador conectado de fora e o servidor reiniciado no meio |
 | Login | Testes automáticos (sessão, renovação, saída, 401, CSRF) e o servidor no ar com "Entrar como dev". O login com uma conta Google de verdade ainda não foi feito: depende do `GOOGLE_CLIENT_ID` |
+| Pets | Testes automáticos (regras, limite, foto, 404 para os de outra conta) e o app de verdade no Chrome: o cadastro com foto escolhida pelo campo de arquivo, reduzida no navegador (uma imagem de 512 px chegou como JPEG de 11 KB) |
 | Vários comedouros | Testes automáticos (cada conta só vê os seus, 404 para os de outra, limites, remoção) e o servidor no ar com o broker: o `pnpm simulador` entrou com a credencial do comedouro, serviu, e foi derrubado e recusado depois da remoção |
 
-São 255 testes no servidor (22 deles precisam do MongoDB no ar) e 63 no app.
+São 292 testes no servidor (24 deles precisam do MongoDB no ar) e 73 no app.
