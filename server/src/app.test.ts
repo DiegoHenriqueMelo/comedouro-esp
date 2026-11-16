@@ -126,6 +126,33 @@ describe("API /v1", () => {
       expect(res.json().motivo).toBe("agenda_acima_do_limite");
     });
 
+    it("o nome do gato é salvo, aparece no status e não vai para o dispositivo", async () => {
+      const { config } = (
+        await t.app.inject({ method: "GET", url: "/v1/config" })
+      ).json();
+      expect(config.nomeDoGato).toBe("");
+
+      const res = await t.app.inject({
+        method: "PUT",
+        url: "/v1/config",
+        payload: { ...config, nomeDoGato: " Mingau " },
+      });
+      expect(res.json().config.nomeDoGato).toBe("Mingau");
+
+      const status = (
+        await t.app.inject({ method: "GET", url: "/v1/status" })
+      ).json();
+      expect(status.nomeDoGato).toBe("Mingau");
+
+      const longo = await t.app.inject({
+        method: "PUT",
+        url: "/v1/config",
+        payload: { ...config, nomeDoGato: "x".repeat(31) },
+      });
+      expect(longo.statusCode).toBe(422);
+      expect(longo.json().motivo).toBe("nome_do_gato_invalido");
+    });
+
     it("PUT sem um campo devolve 400", async () => {
       const res = await t.app.inject({
         method: "PUT",

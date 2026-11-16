@@ -14,6 +14,7 @@ export type CodigoDeErro =
   | "fuso_invalido"
   | "altura_garrafa_invalida"
   | "angulos_invalidos"
+  | "nome_do_gato_invalido"
   | "conflito_de_versao";
 
 export class ErroDeDominio extends Error {

@@ -38,6 +38,7 @@ const configSchema = z.object({
   alturaGarrafaMm: z.number(),
   anguloEncher: z.number(),
   anguloServir: z.number(),
+  nomeDoGato: z.string().max(200).default(""),
 });
 
 const feedSchema = z.object({

@@ -9,6 +9,7 @@ export type ConfigurationProps = {
   fillAngle: number;
   serveAngle: number;
   timeZone: string;
+  petName: string;
 };
 
 // Os quatro fusos do Brasil e o formato POSIX que o ESP32 usa (dúvida 2 do glossário).
@@ -25,6 +26,8 @@ function between(valor: number, min: number, max: number): boolean {
 
 // Os valores que dizem como o alimentador trabalha (glossário: Configuração, regras R7 a R12).
 export class Configuration {
+  static readonly PET_NAME_MAX = 30;
+
   readonly gramsPerPortion: number;
   readonly dailyLimitPortions: number;
   readonly minIntervalMinutes: number;
@@ -33,6 +36,8 @@ export class Configuration {
   readonly fillAngle: number;
   readonly serveAngle: number;
   readonly timeZone: string;
+  // Como o app chama o gato nas frases. Vazio = ainda não informado.
+  readonly petName: string;
 
   private constructor(props: ConfigurationProps) {
     this.gramsPerPortion = props.gramsPerPortion;
@@ -43,6 +48,7 @@ export class Configuration {
     this.fillAngle = props.fillAngle;
     this.serveAngle = props.serveAngle;
     this.timeZone = props.timeZone;
+    this.petName = props.petName;
   }
 
   static create(props: ConfigurationProps): Configuration {
@@ -108,7 +114,15 @@ export class Configuration {
       );
     }
 
-    return new Configuration(props);
+    const petName = props.petName.trim();
+    if (petName.length > Configuration.PET_NAME_MAX) {
+      throw new ErroDeDominio(
+        "nome_do_gato_invalido",
+        `o nome do gato aceita até ${Configuration.PET_NAME_MAX} letras; recebido: ${petName.length}`,
+      );
+    }
+
+    return new Configuration({ ...props, petName });
   }
 
   static default(): Configuration {
@@ -121,6 +135,7 @@ export class Configuration {
       fillAngle: 0,
       serveAngle: 60,
       timeZone: "America/Sao_Paulo",
+      petName: "",
     });
   }
 }

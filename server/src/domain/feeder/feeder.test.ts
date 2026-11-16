@@ -43,6 +43,7 @@ describe("Feeder", () => {
       minIntervalMinutes: 30,
       bowlLimitGrams: 10,
       timeZone: "America/Sao_Paulo",
+      petName: "",
       bottleHeightMm: 230,
       fillAngle: 0,
       serveAngle: 60,

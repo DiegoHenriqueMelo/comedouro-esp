@@ -17,12 +17,14 @@ export type ConfigDto = {
   alturaGarrafaMm: number;
   anguloEncher: number;
   anguloServir: number;
+  nomeDoGato: string;
 };
 
 // A configuração completa que vai para o ESP32 (tópico `config`, retido).
 export type ConfigPayload = {
   versao: number;
-  config: ConfigDto & { fusoPosix: string };
+  // O nome do gato é só do app: não vai para o dispositivo.
+  config: Omit<ConfigDto, "nomeDoGato"> & { fusoPosix: string };
   agenda: ScheduleItemDto[];
 };
 
@@ -56,6 +58,7 @@ export function toConfigDto(c: Configuration): ConfigDto {
     alturaGarrafaMm: c.bottleHeightMm,
     anguloEncher: c.fillAngle,
     anguloServir: c.serveAngle,
+    nomeDoGato: c.petName,
   };
 }
 
@@ -69,11 +72,13 @@ export function fromConfigDto(dto: ConfigDto): Configuration {
     bottleHeightMm: dto.alturaGarrafaMm,
     fillAngle: dto.anguloEncher,
     serveAngle: dto.anguloServir,
+    // Configurações salvas antes de o campo existir não têm o nome.
+    petName: dto.nomeDoGato ?? "",
   });
 }
 
 export function toConfigPayload(feeder: Feeder): ConfigPayload {
-  const config = toConfigDto(feeder.configuration);
+  const { nomeDoGato: _, ...config } = toConfigDto(feeder.configuration);
   return {
     versao: feeder.version,
     config: {

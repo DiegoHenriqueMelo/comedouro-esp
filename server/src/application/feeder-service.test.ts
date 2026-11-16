@@ -41,6 +41,7 @@ describe("FeederService", () => {
     expect(published).toHaveLength(1);
     expect(published[0]).toMatchObject({ versao: 2, agenda: [cafe] });
     expect(published[0]?.config.fusoPosix).toBe("<-03>3");
+    expect(published[0]?.config).not.toHaveProperty("nomeDoGato");
   });
 
   it("uma agenda inválida não é salva nem publicada", async () => {
