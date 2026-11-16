@@ -8,13 +8,17 @@
 | Item | Valor |
 |---|---|
 | Broker | A máquina do servidor, porta `MQTT_BROKER_PORT` (padrão 1883) |
-| Usuário e senha | `MQTT_USERNAME` e `MQTT_PASSWORD` do `.env` do servidor |
+| Usuário e senha | Os do comedouro: o app mostra uma vez, ao criar um comedouro do tipo "Tenho um aparelho" |
+| `<id>` | O id do comedouro. É o mesmo texto do usuário |
 | Client id do dispositivo | Qualquer um que não seja o do servidor. Sugestão: `alimentador-<id>` |
 | Client id do servidor | `servidor-<id>` |
-| `<id>` | O `FEEDER_ID` do `.env` (padrão `principal`) |
 | Last will do dispositivo | Tópico `online`, mensagem `0`, QoS 1, retida |
 
 Quem abre a conexão é sempre o ESP32. O servidor nunca procura o dispositivo.
+
+**Cada aparelho só enxerga o próprio comedouro.** O broker recusa publicar ou assinar qualquer tópico fora de `alimentador/<id>/`. Assinar `#` ou `alimentador/+/...` também é recusado.
+
+**Credencial recusada quer dizer "comedouro removido".** Quando a pessoa remove o comedouro no app, o servidor apaga a senha e derruba o aparelho. Ao tentar voltar, o broker responde "não autorizado" (CONNACK 4 ou 5). O firmware, nesse caso, para de tentar e volta ao modo de pareamento (item F6 do [roteiro do produto](ROTEIRO-PRODUTO.md)).
 
 ## Tópicos
 
@@ -54,6 +58,7 @@ Todos começam com `alimentador/<id>/`.
 - **O `seq` nunca volta atrás.** É um contador inteiro, começa em 1, sobe de 1 em 1 e fica guardado na NVS. O servidor ignora um `seq` que já recebeu, então reenviar é sempre seguro.
 - **Publique os eventos em QoS 1.** A biblioteca PubSubClient só publica em QoS 0. Com ela, um evento pode se perder no meio de uma conexão e só voltar no próximo `sync`. Prefira uma biblioteca que publique em QoS 1, como a `espMqttClient` ou o cliente MQTT do próprio ESP-IDF.
 - **Todo pedido de porção passa pelas mesmas regras** (limite diário, intervalo mínimo e tigela), venha da agenda, do `cmd` ou da Alexa. O `forcar` só ignora a tigela.
+- **Mensagem retida vazia quer dizer "apagada".** Ao remover um comedouro, o servidor publica uma mensagem vazia (retida) em `config`, `sync`, `estado` e `online`. Ignore mensagem vazia: não é um JSON inválido, é o tópico sendo limpo.
 - **A hora vai em ISO 8601 com fuso**, de preferência em UTC: `2026-11-12T10:30:00.000Z`. Sem hora válida (logo depois de ligar, sem internet), guarde o evento e envie quando a hora voltar.
 
 ## Mensagens
@@ -176,6 +181,7 @@ O servidor abre e fecha os alertas a partir daqui: garrafa abaixo de 20%, sensor
 ## Como testar o firmware contra o servidor
 
 1. Suba o servidor com o broker (seção 3 do [guia](GUIA.md)).
-2. Rode `pnpm simulador` em `server/` e observe a conversa no log: é o comportamento esperado.
-3. Pare o simulador, ligue a placa com o mesmo `FEEDER_ID` e confira no app: deve aparecer "Online" e "Configuração sincronizada".
-4. Os testes em [`mqtt.integration.test.ts`](../server/src/infra/mqtt/mqtt.integration.test.ts) descrevem os casos que o firmware precisa cobrir: receber a configuração retida, responder ao servir, cair sem avisar e completar o histórico depois que o servidor volta.
+2. No app, crie um comedouro do tipo "Tenho um aparelho" e anote o usuário e a senha.
+3. Rode `SIM_USUARIO=<usuário> SIM_SENHA=<senha> pnpm simulador` em `server/` e observe a conversa no log: é o comportamento esperado.
+4. Pare o simulador, ligue a placa com a mesma credencial e confira no app: deve aparecer "Online" e "Configuração sincronizada".
+5. Os testes em [`mqtt.integration.test.ts`](../server/src/infra/mqtt/mqtt.integration.test.ts) descrevem os casos que o firmware precisa cobrir: receber a configuração retida, responder ao servir, cair sem avisar e completar o histórico depois que o servidor volta.

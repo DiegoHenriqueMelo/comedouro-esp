@@ -4,7 +4,7 @@
 > Continua o [ROTEIRO-SISTEMA.md](ROTEIRO-SISTEMA.md) (E0–E13). As decisões vieram de um grill em 16/11/2026.
 > **Formato:** o Claude implementa o servidor e o PWA com TDD, uma etapa por vez, com commit e explicação ao fim de cada uma. O firmware (seção 6) é seu, com mentoria no método do [mentoria.md](mentoria.md). Toda tela nova segue o [UI-UX.md](UI-UX.md).
 >
-> **Progresso (16/11/2026):** P1 concluída (falta só você testar com uma conta Google de verdade). 206 testes no servidor e 52 no app.
+> **Progresso (16/11/2026):** P1 e P2 concluídas (da P1, falta só você testar com uma conta Google de verdade). 255 testes no servidor e 63 no app.
 
 ---
 
@@ -105,7 +105,7 @@ Todas as rotas (menos login e pareamento) exigem sessão. As rotas de hoje passa
 | Etapa | Entrega | Horas | Situação |
 |---|---|---|---|
 | P1 | Contas: login com Google, sessão, dono | 6–8 | ✅ Concluída. Falta o teste com o seu Client ID |
-| P2 | Vários comedouros: apelido, rotas por comedouro, broker por aparelho | 8–12 | ⬜ |
+| P2 | Vários comedouros: apelido, rotas por comedouro, broker por aparelho | 8–12 | ✅ Concluída |
 | P3 | Pets | 4–6 | ⬜ |
 | P4 | Pareamento e comedouro simulado | 6–8 | ⬜ |
 | P5 | Dashboard, previsão, pausa e copiar agenda | 6–10 | ⬜ |
@@ -136,13 +136,20 @@ Todas as rotas (menos login e pareamento) exigem sessão. As rotas de hoje passa
 
 **Objetivo:** cada conta tem os próprios comedouros, e cada aparelho só enxerga os próprios tópicos.
 
-- [ ] `Feeder` ganha `ownerId`, `apelido`, `tipo` e `pausa` (a pausa só aparece na P5); sai o `petName` / `nomeDoGato`
-- [ ] Repositório busca por `id` **e** `ownerId`; casos de uso recebem o `userId`
-- [ ] Rotas de hoje passam para `/v1/comedouros/:id/...`; `GET/POST/PATCH/DELETE /v1/comedouros`
-- [ ] Sai o `FEEDER_ID` do `.env` e o "um dispositivo só" da composição: um `DeviceGateway` cuida de N comedouros (um `MqttDevice` ou `InProcessDevice` por id)
-- [ ] Broker: autenticação pelo `DeviceCredential` (ou pelo usuário do servidor); autorização que limita cada aparelho a `alimentador/<seu id>/#`
-- [ ] Avisos e push por usuário, com o apelido no texto (D16)
-- [ ] PWA: rotas com URL (`/comedouros/:id/agenda`), as quatro telas de hoje recebem o id; frases usam o apelido
+> ✅ **Concluída em 16/11/2026.** Diferenças em relação ao plano:
+> - **Dono e apelido ficaram num agregado separado**, o `FeederProfile` (id, dono, apelido, tipo, criado em). O `Feeder` continua só com as regras R1–R12. Assim, trocar o apelido não disputa versão com quem está salvando a agenda, e o domínio do comedouro não mudou. A `pausa` entra no `Feeder` na P5, porque mexe na agenda.
+> - **A credencial do aparelho já existe**, mas sai na criação: ao criar um comedouro do tipo "aparelho", o app mostra o usuário e a senha uma vez. Na P4, isso vira o código de 6 dígitos.
+> - **Saíram o `MQTT_URL` e o `FEEDER_ID`.** Com credencial por aparelho, só o broker embutido sabe conferir quem é quem.
+> - **No app, a lista de comedouros é simples** (apelido e estado em palavras). O dashboard com última e próxima refeição e nível da garrafa é a P5. Notificações e "Sua conta" foram para a lista, porque são da conta, e não de um comedouro.
+> - **Ao remover**, o servidor publica mensagens retidas vazias nos tópicos do comedouro e derruba o aparelho. Testado de ponta a ponta com o `pnpm simulador`.
+
+- [x] `Feeder` ganha `ownerId`, `apelido`, `tipo` e `pausa` (a pausa só aparece na P5); sai o `petName` / `nomeDoGato`
+- [x] Repositório busca por `id` **e** `ownerId`; casos de uso recebem o `userId`
+- [x] Rotas de hoje passam para `/v1/comedouros/:id/...`; `GET/POST/PATCH/DELETE /v1/comedouros`
+- [x] Sai o `FEEDER_ID` do `.env` e o "um dispositivo só" da composição: um `DeviceGateway` cuida de N comedouros (um `MqttDevice` ou `InProcessDevice` por id)
+- [x] Broker: autenticação pelo `DeviceCredential` (ou pelo usuário do servidor); autorização que limita cada aparelho a `alimentador/<seu id>/#`
+- [x] Avisos e push por usuário, com o apelido no texto (D16)
+- [x] PWA: rotas com URL (`/comedouros/:id/agenda`), as quatro telas de hoje recebem o id; frases usam o apelido
 
 **Testes primeiro:** comedouro de outra conta → 404 em todas as rotas; aparelho A não consegue assinar nem publicar em `alimentador/B/#`; criar dois comedouros gera duas configurações retidas independentes.
 

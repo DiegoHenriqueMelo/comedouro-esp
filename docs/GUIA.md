@@ -17,13 +17,13 @@
 - **O ESP32** decide cada porção: agenda, limite diário, intervalo mínimo e tigela. Se o servidor cair, ele continua servindo pela agenda e manda o histórico quando o servidor voltar.
 - **O app** é um PWA: abre no navegador e pode ser instalado na tela inicial do celular.
 
-O servidor roda em três modos. Quem escolhe é o arquivo `.env` (seção 3).
+Cada pessoa entra com a conta dela e tem os próprios comedouros (até 10). Um comedouro é de um destes tipos:
 
-| Modo | Para quê | O que precisa |
+| Tipo | Para quê | O que precisa |
 |---|---|---|
-| **Demonstração** | Ver o app funcionando sem nenhuma peça | Nada. É o padrão sem `.env` |
-| **Com o simulador** | Testar o caminho real (broker MQTT) sem a placa | `.env` com o broker, e o `pnpm simulador` rodando |
-| **Com o ESP32** | O uso de verdade | `.env` com o broker, e a placa com o firmware |
+| **Simulado** ("Experimentar sem aparelho") | Ver o app funcionando sem nenhuma peça. Um por conta | Nada |
+| **Aparelho**, com o `pnpm simulador` | Testar o caminho real (broker MQTT) sem a placa | `.env` com o broker, e o simulador rodando com a credencial do comedouro |
+| **Aparelho**, com o ESP32 | O uso de verdade | `.env` com o broker, e a placa com o firmware e a credencial |
 
 ## 2. Começar em 2 minutos (modo demonstração)
 
@@ -35,7 +35,7 @@ docker compose up -d --build
 
 Antes da primeira vez, crie na raiz do repo um arquivo `.env` com uma linha só: `DEV_LOGIN=true`. Ela liga o botão "Entrar como dev", que dispensa a conta Google (seção 3.5).
 
-Abra **http://localhost:3000** e toque em "Entrar como dev". O app aparece com a etiqueta "Simulado": um alimentador de mentira roda dentro do servidor. Dá para servir, montar a agenda e ver o histórico. Em **Ajustes → Simulador**, você põe ração na tigela ou esvazia a garrafa para ver as recusas e os avisos acontecerem.
+Abra **http://localhost:3000** e toque em "Entrar como dev". Na lista de comedouros, adicione um com o tipo **"Experimentar sem aparelho"**: um alimentador de mentira passa a rodar dentro do servidor. Dá para servir, montar a agenda e ver o histórico. Em **Ajustes → Simulador**, você põe ração na tigela ou esvazia a garrafa para ver as recusas e os avisos acontecerem.
 
 Para parar: `docker compose down`. Os dados ficam guardados no volume do MongoDB.
 
@@ -56,19 +56,21 @@ Copie o `.env.example` para `.env`, na raiz do repo, e preencha. O `.env` não v
 
 | Variável | Padrão | O que faz |
 |---|---|---|
-| `MQTT_BROKER_PORT` | vazia | Com um valor (use `1883`), o servidor abre um broker MQTT nessa porta. Sem ela, vale o modo demonstração |
-| `MQTT_USERNAME` | vazia | O usuário que o ESP32 usa para conectar. Obrigatório com o broker |
-| `MQTT_PASSWORD` | vazia | A senha. Obrigatória com o broker. Use uma senha de verdade |
-| `MQTT_URL` | vazia | Para usar um broker que já existe (um Mosquitto, por exemplo), no lugar do embutido. Exemplo: `mqtt://192.168.0.10:1883` |
-| `FEEDER_ID` | `principal` | O nome do alimentador nos tópicos MQTT. Tem que ser igual no ESP32 |
+| `MQTT_BROKER_PORT` | vazia | Com um valor (use `1883`), o servidor abre um broker MQTT nessa porta, e o app passa a aceitar comedouros do tipo "Tenho um aparelho". Sem ela, só simulados |
+| `MQTT_USERNAME` | vazia | O usuário do **próprio servidor** no broker. Obrigatório com o broker |
+| `MQTT_PASSWORD` | vazia | A senha do servidor no broker. Obrigatória com o broker. Use uma senha de verdade |
 
-O mínimo para sair do modo demonstração:
+O mínimo para aceitar aparelhos:
 
 ```
 MQTT_BROKER_PORT=1883
-MQTT_USERNAME=comedouro
+MQTT_USERNAME=servidor
 MQTT_PASSWORD=uma-senha-so-sua
 ```
+
+**Os aparelhos não usam esse usuário.** Cada comedouro do tipo "aparelho" ganha, ao ser criado, um usuário e uma senha só dele, que o app mostra **uma vez**. Com eles, o aparelho só consegue mexer nos tópicos do próprio comedouro. Remover o comedouro apaga a senha e derruba o aparelho.
+
+O `MQTT_URL` (broker externo) e o `FEEDER_ID` deixaram de existir: o broker embutido é quem confere a senha de cada aparelho, e o id de cada comedouro vem do app.
 
 ### 3.2 Banco de dados
 
@@ -152,13 +154,16 @@ Portas usadas na máquina: **3000** (app e API), **1883** (broker MQTT, para o E
 
 O simulador é um programa que se comporta como o ESP32: conecta no broker, recebe a configuração, roda a agenda e manda os eventos. Com o servidor no ar e o `.env` com o broker:
 
-```
-cd server
-pnpm install
-pnpm simulador
-```
+1. No app, adicione um comedouro com o tipo **"Tenho um aparelho"** e anote o usuário e a senha que aparecem.
+2. Rode o simulador com eles:
+   ```
+   cd server
+   pnpm install
+   SIM_USUARIO=<usuário> SIM_SENHA=<senha> pnpm simulador
+   ```
+   No PowerShell: `$env:SIM_USUARIO="<usuário>"; $env:SIM_SENHA="<senha>"; pnpm simulador`.
 
-Ele lê o mesmo `.env`. No app, a etiqueta "Simulado" some e aparece "Online". No terminal do simulador, dá para mexer no "mundo físico":
+Ele lê a porta do broker do mesmo `.env`. No app, o comedouro passa a aparecer "Online". Se o comedouro for removido, o simulador é derrubado e avisa que a credencial foi recusada. No terminal do simulador, dá para mexer no "mundo físico":
 
 | Digite | O que acontece |
 |---|---|
@@ -194,6 +199,10 @@ Para guardar os dados entre reinícios, suba só o banco (`docker compose up -d 
 Os testes dos repositórios do MongoDB só rodam com o banco no ar (`docker compose up -d mongo`). Sem ele, aparecem como "skipped", e o resto roda normalmente.
 
 ## 5. O app
+
+### 5.0 Comedouros
+
+A primeira tela depois de entrar. Cada comedouro aparece com o apelido e o estado em palavras ("Tudo certo", "1 aviso", "Offline"); tocar num deles abre as quatro telas abaixo. Embaixo, **Adicionar comedouro**, **Notificações** (deste aparelho) e **Sua conta** (com o "Sair"). Nas telas de um comedouro, o "‹ Comedouros", no topo, volta para cá.
 
 ### 5.1 Início
 
@@ -258,7 +267,7 @@ Baixar o limite diário ou aumentar o intervalo mínimo também é recusado quan
 - **Soltar porções para pesar:** solta N porções sem contar no limite diário. Pese numa balança de cozinha, divida pelo número de porções e ponha o resultado em "Gramas por porção".
 - **Testar ângulo:** move o servo até o ângulo digitado no campo, antes de salvar.
 
-**Notificações:** ativa ou desativa os avisos neste aparelho, e manda um aviso de teste.
+**Comedouro:** troca o apelido. No fim da tela, **Remover este comedouro** apaga a agenda, os ajustes, o histórico e a senha do aparelho, depois de uma confirmação.
 
 **Sincronização:** no rodapé, "sincronizada" quer dizer que o ESP32 já aplicou a última configuração. "Ainda não aplicada" aparece enquanto ele está offline; ele recebe quando voltar.
 
@@ -309,11 +318,11 @@ No iPhone, as notificações só funcionam com o app **instalado na tela inicial
 1. Deixe o servidor no modo com broker (seção 3.1).
 2. Descubra o IP da máquina do servidor na rede da casa e **reserve esse IP no roteador**: o ESP32 precisa achar o broker sempre no mesmo endereço.
 3. Libere as portas **1883** e **3000** no firewall da máquina para a rede local.
-4. No firmware, configure: o IP da máquina, a porta 1883, o usuário e a senha do `.env`, e o mesmo `FEEDER_ID`.
+4. No app, adicione um comedouro com o tipo **"Tenho um aparelho"**. No firmware, configure o IP da máquina, a porta 1883 e o usuário e a senha que o app mostrou. O usuário é também o id do comedouro nos tópicos MQTT.
 5. O firmware segue o [protocolo MQTT](protocolo-mqtt.md). O simulador é a referência de comportamento.
 6. Ligue a placa. No app, deve aparecer "Online" e, no rodapé de Ajustes, "sincronizada".
 
-Não rode o simulador e a placa ao mesmo tempo com o mesmo `FEEDER_ID`: os dois responderiam aos mesmos comandos.
+Não rode o simulador e a placa ao mesmo tempo com a mesma credencial: os dois responderiam aos mesmos comandos. Na etapa P4 do [roteiro do produto](ROTEIRO-PRODUTO.md), o usuário e a senha dão lugar a um código de pareamento de 6 dígitos.
 
 ## 8. Cópia de segurança
 
@@ -339,7 +348,8 @@ O backup não é automático. Se quiser um diário, agende o primeiro comando no
 |---|---|---|
 | O servidor não sobe e o log fala em `MQTT_USERNAME` | O `.env` tem `MQTT_BROKER_PORT` sem usuário ou senha | Preencher os três |
 | O app mostra "Simulado" e você queria o modo real | O `.env` está sem `MQTT_BROKER_PORT`, ou não foi aplicado | Conferir o `.env` e rodar `docker compose up -d` |
-| "Offline" com o simulador rodando | Senha, porta ou `FEEDER_ID` diferentes dos do servidor | O simulador lê o mesmo `.env`: conferir se ele está na raiz do repo |
+| "Offline" com o simulador rodando | Usuário ou senha do comedouro errados, ou porta diferente | Conferir o `SIM_USUARIO` e o `SIM_SENHA`. Perdeu a senha? Remova o comedouro e crie de novo |
+| "Credencial recusada" no simulador | O comedouro foi removido no app | Criar outro comedouro e usar a credencial nova |
 | "Offline" com a placa ligada | IP errado, firewall ou senha | Testar com o simulador em outra máquina da rede; conferir a seção 7 |
 | "Configuração pendente" que não some | O dispositivo está offline, ou não devolve a versão no estado | Conferir o `configVersao` no estado do firmware |
 | A porta 3000 ou 1883 já está em uso | Outro programa na mesma porta | Mudar o lado esquerdo do `ports` no `docker-compose.yml` |
@@ -363,18 +373,27 @@ O app usa esta API, em `/v1`. Todas as rotas, menos as de `/v1/sessao`, exigem o
 
 | Método e rota | O que faz |
 |---|---|
-| `GET /v1/status` | O estado atual: online, hoje, tigela, garrafa, próxima refeição, alertas |
-| `POST /v1/feed` | Serve agora. Corpo: `{ "porcoes": 1, "forcar": false }` |
-| `GET /v1/schedules` · `PUT /v1/schedules` | Lê ou troca a agenda. Corpo do PUT: `[{ "hora": "07:30", "porcoes": 2, "ativo": true }]` |
-| `GET /v1/config` · `PUT /v1/config` | Lê ou troca os ajustes |
-| `GET /v1/history?limit=50` | O histórico. `limit` de 1 a 200 |
-| `POST /v1/alerts/ack` | O "Entendi" |
-| `POST /v1/scale/tare` | Tara a balança |
-| `POST /v1/scale/calibrate` | Calibra a balança. Corpo: `{ "gramas": 500 }` |
-| `POST /v1/calibrate` | Solta porções para pesar. Corpo: `{ "porcoes": 20 }` |
-| `POST /v1/servo/test` | Move o servo. Corpo: `{ "angulo": 60 }` |
-| `GET /v1/push/public-key` · `POST /v1/push/subscribe` · `POST /v1/push/unsubscribe` · `POST /v1/push/test` | Notificações |
-| `POST /v1/simulador` | Só no modo demonstração. Corpo: `{ "tigelaGramas": 30 }`, `{ "garrafaGramas": 100 }`, `{ "balanca": false }` |
+| `GET /v1/comedouros` | Os comedouros da conta, com o estado de cada um, e se o servidor aceita aparelhos |
+| `POST /v1/comedouros` | Cria um. Corpo: `{ "apelido": "Cozinha", "tipo": "simulado" }` ou `"aparelho"`. Para aparelho, devolve `credencial: { usuario, senha }` uma vez só |
+| `PATCH /v1/comedouros/:id` | Troca o apelido. Corpo: `{ "apelido": "Sala" }` |
+| `DELETE /v1/comedouros/:id` | Remove o comedouro e todos os dados dele, e apaga a credencial do aparelho |
+| `GET /v1/push/public-key` · `POST /v1/push/subscribe` · `POST /v1/push/unsubscribe` · `POST /v1/push/test` | Notificações deste aparelho, ligadas à conta |
+
+As rotas abaixo são de um comedouro e começam com `/v1/comedouros/:id`. Comedouro de outra conta responde 404, igual a um que não existe.
+
+| Método e rota | O que faz |
+|---|---|
+| `GET …/status` | O estado atual: apelido, online, hoje, tigela, garrafa, próxima refeição, alertas |
+| `POST …/feed` | Serve agora. Corpo: `{ "porcoes": 1, "forcar": false }` |
+| `GET …/schedules` · `PUT …/schedules` | Lê ou troca a agenda. Corpo do PUT: `[{ "hora": "07:30", "porcoes": 2, "ativo": true }]` |
+| `GET …/config` · `PUT …/config` | Lê ou troca os ajustes |
+| `GET …/history?limit=50` | O histórico. `limit` de 1 a 200 |
+| `POST …/alerts/ack` | O "Entendi" |
+| `POST …/scale/tare` | Tara a balança |
+| `POST …/scale/calibrate` | Calibra a balança. Corpo: `{ "gramas": 500 }` |
+| `POST …/calibrate` | Solta porções para pesar. Corpo: `{ "porcoes": 20 }` |
+| `POST …/servo/test` | Move o servo. Corpo: `{ "angulo": 60 }` |
+| `POST …/simulador` | Só nos comedouros simulados. Corpo: `{ "tigelaGramas": 30 }`, `{ "garrafaGramas": 100 }`, `{ "balanca": false }` |
 | `GET /health` | `{ "status": "ok" }` |
 
 | Status | Quando |
@@ -383,6 +402,7 @@ O app usa esta API, em `/v1`. Todas as rotas, menos as de `/v1/sessao`, exigem o
 | 400 | A forma do dado está errada: campo faltando, tipo errado |
 | 401 | Sem sessão, sessão vencida, ou o Google não confirmou a credencial |
 | 403 | O pedido veio de outro site (proteção contra CSRF) |
+| 404 | O comedouro não existe, ou é de outra conta |
 | 409 | O alimentador está ocupado, ou duas edições ao mesmo tempo |
 | 422 | Uma regra recusou. O corpo traz `motivo` e `mensagem` |
 | 429 | O alimentador recusou o pedido de porção. O corpo traz o `motivo` |
@@ -390,10 +410,10 @@ O app usa esta API, em `/v1`. Todas as rotas, menos as de `/v1/sessao`, exigem o
 
 ## 11. Limites conhecidos
 
-- **Toda conta vê o mesmo alimentador.** O login já existe, mas cada usuário só passa a ter os próprios comedouros na etapa P2 do [roteiro do produto](ROTEIRO-PRODUTO.md). Até lá, use só na rede de casa e pelo Tailscale. **Nunca abra a porta 3000 nem a 1883 para a internet.**
-- **O broker MQTT não usa TLS.** A senha passa em texto na rede da casa. Para um servidor na nuvem, seria preciso um broker com TLS.
+- **Ainda não está pronto para a internet aberta.** Cada conta já tem os próprios comedouros, mas o broker MQTT ainda não usa TLS: a senha do aparelho passa em texto. Até a etapa P7 do [roteiro do produto](ROTEIRO-PRODUTO.md), use só na rede de casa e pelo Tailscale. **Nunca abra a porta 3000 nem a 1883 para a internet.**
 - **Não testado com aparelhos de verdade:** a entrega das notificações push num celular, o acesso pelo Tailscale, a instalação no iPhone e a placa ESP32. O código dessas partes existe e tem testes automáticos até onde dá sem os aparelhos; a seção 12 mostra o que foi conferido.
-- **Um alimentador só.** O sistema guarda um alimentador por servidor.
+- **Uma conexão MQTT do servidor por comedouro.** Para dezenas de comedouros, está bem; para milhares, o servidor precisaria de uma conexão só para todos.
+- **Os dados de antes da P2 não aparecem.** O alimentador "principal" de quando o servidor tinha um comedouro só fica no banco, sem dono. Para recomeçar limpo: `docker compose down -v` (apaga o banco).
 - **O backup não é automático** (seção 8).
 
 ## 12. O que foi testado
@@ -409,5 +429,6 @@ O app usa esta API, em `/v1`. Todas as rotas, menos as de `/v1/sessao`, exigem o
 | O app | Testes da lógica das telas, e conferência visual das quatro telas em tamanho de celular, nos temas claro e escuro |
 | Docker | O compose inteiro, com o simulador conectado de fora e o servidor reiniciado no meio |
 | Login | Testes automáticos (sessão, renovação, saída, 401, CSRF) e o servidor no ar com "Entrar como dev". O login com uma conta Google de verdade ainda não foi feito: depende do `GOOGLE_CLIENT_ID` |
+| Vários comedouros | Testes automáticos (cada conta só vê os seus, 404 para os de outra, limites, remoção) e o servidor no ar com o broker: o `pnpm simulador` entrou com a credencial do comedouro, serviu, e foi derrubado e recusado depois da remoção |
 
-São 206 testes no servidor (17 deles precisam do MongoDB no ar) e 52 no app.
+São 255 testes no servidor (22 deles precisam do MongoDB no ar) e 63 no app.

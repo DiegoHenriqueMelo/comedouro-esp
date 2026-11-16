@@ -220,7 +220,7 @@ Toda tela que busca dados tem os três estados desenhados:
 
 A tela inicial, de cima para baixo:
 
-1. **Frase de situação.** Uma ou duas frases que resumem tudo: "O Mingau almoçou às 12:30. Próxima refeição às 18:00." Quando existe um problema, a frase vira o problema: "O comedouro está offline há 40 minutos."
+1. **Frase de situação.** Uma ou duas frases que resumem tudo: "Cozinha serviu às 12:30. Próxima refeição às 18:00." Quando existe um problema, a frase vira o problema: "O comedouro está offline há 40 minutos."
 2. **Avisos**, se houver.
 3. **Bloco principal:** servir agora.
 4. **Indicadores:** hoje, garrafa e tigela.
@@ -236,20 +236,21 @@ Se dois elementos disputam o topo, um deles está na tela errada.
 
 ## 7. Texto
 
-### 7.1 O nome do gato
+### 7.1 O apelido do comedouro
 
-O app chama o gato pelo nome: é a assinatura do comedouro. O nome é configurado em Ajustes. Enquanto não houver nome, use "seu gato".
+Desde 16/11/2026 (decisão D6 do [roteiro do produto](ROTEIRO-PRODUTO.md)), as frases usam o **apelido do comedouro**, e não o nome do gato: uma conta pode ter vários comedouros, e o comedouro não sabe qual bicho comeu. O pet ganha um cadastro próprio na etapa P3. Sem apelido, use "o comedouro".
 
-- "O Mingau almoçou às 12:30."
-- "Próxima refeição do Mingau às 18:00."
+- "Cozinha serviu às 12:30."
+- "Próxima refeição às 18:00."
+- Na notificação: "Cozinha: Ração acabando".
 
-O nome aparece nas frases de situação e nos avisos, não em todo rótulo. "Tigela" continua "Tigela".
+O apelido é o título da tela inicial do comedouro, e aparece nas frases de situação e nos avisos, não em todo rótulo. "Tigela" continua "Tigela".
 
 ### 7.2 Tom: direto e gentil
 
 | Faça | Não faça |
 |---|---|
-| "O Mingau almoçou às 12:30." | "O Mingau já está de barriga cheia!" |
+| "Cozinha serviu às 12:30." | "A Cozinha já mandou o almoço!" |
 | "A tigela ainda tem 12 g." | "Opa, ainda tem ração na tigela." |
 | "A ração está acabando: dá para 3 dias." | "ALERTA: nível crítico de ração (11%)." |
 | "Sem contato com o comedouro há 40 minutos." | "Erro 503: dispositivo indisponível." |
@@ -288,7 +289,7 @@ Regras:
 | Tipografia | Uma sans humanista para tudo. Proposta: Figtree |
 | Estado | Três cores (sálvia, âmbar e tijolo), sempre como texto com ponto |
 | Ícones | Permitidos, de linha e de uma cor só. Emoji, nunca |
-| Assinatura | O nome do gato nas frases |
+| Assinatura | O apelido do comedouro nas frases (era o nome do gato até a P2) |
 | Hierarquia | Primeiro "está tudo bem?", depois a ação, depois os números |
 | Tom | Direto e gentil |
 
@@ -297,7 +298,7 @@ Regras:
 - **Validar as telas refeitas** em 16/11/2026, num celular de verdade. As cores foram conferidas por cálculo de contraste e em capturas de 390 px, mas ainda não num aparelho.
 - **A Figtree** foi a proposta para "uma sans humanista" e já está embutida no app. Se preferir outra do mesmo estilo, troque aqui e em `web/src/main.tsx`.
 
-Já feito em 16/11/2026: as quatro telas, o campo "nome do gato" em Ajustes (guardado no servidor), a frase de situação no topo da tela inicial e a fonte embutida.
+Já feito em 16/11/2026: as quatro telas, a frase de situação no topo da tela inicial, a fonte embutida, a tela de login e a lista de comedouros. O campo "nome do gato" saiu na P2, trocado pelo apelido do comedouro.
 
 ## 10. Antes de entregar uma tela
 
