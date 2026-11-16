@@ -20,6 +20,7 @@ const cozinha: FeederSummary = {
   criadoEm: "2026-11-16T12:00:00.000Z",
   online: true,
   alertas: 0,
+  pareado: true,
 };
 
 beforeEach(() => window.history.replaceState(null, "", "/"));
@@ -64,6 +65,17 @@ describe("estado na lista", () => {
     expect(feederState({ ...cozinha, alertas: 3 }).text).toBe("3 avisos");
     expect(feederState(cozinha)).toEqual({ tone: "ok", text: "Tudo certo" });
   });
+
+  it("aparelho que ainda não pareou: aviso, antes de tudo", () => {
+    expect(
+      feederState({
+        ...cozinha,
+        tipo: "aparelho",
+        pareado: false,
+        online: false,
+      }),
+    ).toEqual({ tone: "warn", text: "Esperando pareamento" });
+  });
 });
 
 describe("FeedersPage", () => {
@@ -107,7 +119,7 @@ describe("FeedersPage", () => {
     });
     const create = vi
       .spyOn(api, "createFeeder")
-      .mockResolvedValue({ comedouro: cozinha, credencial: null });
+      .mockResolvedValue({ comedouro: cozinha, codigo: null });
     render(<FeedersPage user={ana} />);
 
     await userEvent.type(await screen.findByLabelText(/Apelido/), "Cozinha");
@@ -117,23 +129,27 @@ describe("FeedersPage", () => {
     expect(window.location.pathname).toBe("/comedouros/f1");
   });
 
-  it("criar um aparelho mostra o usuário e a senha, uma vez", async () => {
+  it("criar um aparelho leva para a tela dele, onde está o código", async () => {
     vi.spyOn(api, "feeders").mockResolvedValue({
       aparelhoDisponivel: true,
       comedouros: [],
     });
-    vi.spyOn(api, "createFeeder").mockResolvedValue({
-      comedouro: { ...cozinha, apelido: "Sala", tipo: "aparelho" },
-      credencial: { usuario: "f1", senha: "senha-secreta" },
+    const create = vi.spyOn(api, "createFeeder").mockResolvedValue({
+      comedouro: {
+        ...cozinha,
+        apelido: "Sala",
+        tipo: "aparelho",
+        pareado: false,
+      },
+      codigo: { codigo: "482913", expiraEm: "2026-11-16T12:10:00.000Z" },
     });
     render(<FeedersPage user={ana} />);
 
     await userEvent.type(await screen.findByLabelText(/Apelido/), "Sala");
     await userEvent.click(screen.getByRole("button", { name: "Adicionar" }));
 
-    expect(await screen.findByText("Sala foi adicionado")).toBeInTheDocument();
-    expect(screen.getByText("senha-secreta")).toBeInTheDocument();
-    expect(window.location.pathname).toBe("/");
+    expect(create).toHaveBeenCalledWith("Sala", "aparelho");
+    expect(window.location.pathname).toBe("/comedouros/f1");
   });
 
   it("apelido recusado: o erro aparece embaixo do campo", async () => {

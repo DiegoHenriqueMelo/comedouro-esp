@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, type Config } from "../api";
 import { useAction, useLoad } from "../hooks";
-import { fieldFor, messageFor } from "../messages";
+import { fieldFor, formatDay, formatTime, messageFor } from "../messages";
 import { navigate } from "../router";
 import {
   Card,
@@ -12,6 +12,7 @@ import {
   Loading,
   parseNumber,
 } from "../ui";
+import { PairingBlock } from "./Pairing";
 
 type NumericKey = Exclude<keyof Config, "fusoHorario">;
 
@@ -168,6 +169,9 @@ export function SettingsPage(props: { feederId: string }) {
           apelido={status.data.apelido}
           onDone={status.reload}
         />
+      )}
+      {status.data?.tipo === "aparelho" && status.data.pareado && (
+        <Device feederId={props.feederId} pairedAt={status.data.pareadoEm} />
       )}
 
       <Card title="Alimentação">
@@ -529,6 +533,40 @@ export function RemoveFeeder(props: { feederId: string }) {
           ele deixa de conectar e precisa ser cadastrado de novo.
         </ConfirmDialog>
       )}
+    </>
+  );
+}
+
+// "hoje", "ontem" ou "em 12/11".
+export function pairedWhen(iso: string, now: Date = new Date()): string {
+  const day = formatDay(iso, now);
+  return day === "Hoje" || day === "Ontem" ? day.toLowerCase() : `em ${day}`;
+}
+
+// O aparelho deste comedouro. "Parear de novo" serve para um ESP32 resetado ou trocado:
+// a senha antiga deixa de valer, e a agenda e os ajustes continuam.
+function Device(props: { feederId: string; pairedAt: string | null }) {
+  const [pairing, setPairing] = useState(false);
+
+  return (
+    <>
+      <Card title="Aparelho">
+        {props.pairedAt && (
+          <p className="legend">
+            Pareado {pairedWhen(props.pairedAt)}, às{" "}
+            {formatTime(props.pairedAt)}. Use “Parear de novo” se o comedouro
+            foi resetado ou trocado: a agenda e os ajustes continuam.
+          </p>
+        )}
+        <button
+          type="button"
+          className="button"
+          onClick={() => setPairing(!pairing)}
+        >
+          {pairing ? "Fechar o código" : "Parear de novo"}
+        </button>
+      </Card>
+      {pairing && <PairingBlock feederId={props.feederId} fresh />}
     </>
   );
 }

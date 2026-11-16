@@ -619,6 +619,43 @@ select {
   cursor: default;
 }
 
+/* Pareamento: o código é o número mais importante da tela. */
+.pairing {
+  align-items: stretch;
+}
+
+.pairing-label {
+  font-weight: 600;
+  text-align: center;
+}
+
+.pairing-code {
+  font-size: 44px;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: 0.08em;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.pairing-code-off {
+  color: var(--tinta-suave);
+  text-decoration: line-through;
+}
+
+.pairing-left {
+  color: var(--tinta-suave);
+  text-align: center;
+}
+
+.pairing-steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--e2);
+  margin: 0;
+  padding-left: var(--e5);
+}
+
 /* 5.13 Confirmação: a janela no centro. O fundo escurece em tinta, sem desfoque (proibição 3). */
 .dialog-backdrop {
   position: fixed;

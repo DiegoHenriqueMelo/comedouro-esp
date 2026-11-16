@@ -30,6 +30,8 @@ const MOTIVOS: Record<string, string> = {
   aparelho_indisponivel:
     "Este servidor ainda não aceita aparelhos: falta ligar o broker MQTT.",
   nao_encontrado: "Não encontrado: pode ter sido removido.",
+  // pareamento
+  nao_e_aparelho: "Só um comedouro de aparelho tem código.",
   // pets
   nome_do_pet_invalido: "O nome precisa ter de 1 a 30 letras.",
   especie_invalida: "Escolha gato ou cachorro.",

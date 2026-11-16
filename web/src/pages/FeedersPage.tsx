@@ -1,11 +1,5 @@
 import { useState } from "react";
-import {
-  api,
-  type DeviceCredential,
-  type FeederKind,
-  type FeederSummary,
-  type User,
-} from "../api";
+import { api, type FeederKind, type FeederSummary, type User } from "../api";
 import { type Tone, useAction, useLoad } from "../hooks";
 import { fieldFor, messageFor, petLine } from "../messages";
 import { feederPath, navigate, petPath } from "../router";
@@ -16,7 +10,6 @@ import {
   Icon,
   LoadError,
   Loading,
-  Notice,
   StateLine,
 } from "../ui";
 import { Account, Notifications } from "./AccountCards";
@@ -26,10 +19,6 @@ import { PetAvatar } from "./PetPage";
 export function FeedersPage(props: { user: User }) {
   const feeders = useLoad(api.feeders, 5000);
   const [adding, setAdding] = useState(false);
-  const [created, setCreated] = useState<{
-    comedouro: FeederSummary;
-    credencial: DeviceCredential;
-  } | null>(null);
 
   if (feeders.loading) return <Loading />;
   if (!feeders.data) {
@@ -49,14 +38,6 @@ export function FeedersPage(props: { user: User }) {
       <header className="page-header">
         <h1>Comedouros</h1>
       </header>
-
-      {created && (
-        <NewDeviceCredential
-          apelido={created.comedouro.apelido}
-          credencial={created.credencial}
-          onClose={() => setCreated(null)}
-        />
-      )}
 
       {empty && !adding && (
         <p className="legend">
@@ -83,25 +64,15 @@ export function FeedersPage(props: { user: User }) {
           onCancel={() => setAdding(false)}
           onCreated={async (result) => {
             setAdding(false);
-            if (result.credencial) {
-              setCreated({
-                comedouro: result.comedouro,
-                credencial: result.credencial,
-              });
-              await feeders.reload();
-            } else {
-              navigate(feederPath(result.comedouro.id));
-            }
+            // Um aparelho abre na tela do código de pareamento; um simulado, já funcionando.
+            navigate(feederPath(result.comedouro.id));
           }}
         />
       ) : (
         <button
           type="button"
           className="button"
-          onClick={() => {
-            setCreated(null);
-            setAdding(true);
-          }}
+          onClick={() => setAdding(true)}
         >
           Adicionar comedouro
         </button>
@@ -166,6 +137,7 @@ export function feederState(feeder: FeederSummary): {
   tone: Tone;
   text: string;
 } {
+  if (!feeder.pareado) return { tone: "warn", text: "Esperando pareamento" };
   if (!feeder.online) return { tone: "bad", text: "Offline" };
   if (feeder.alertas > 0) {
     return {
@@ -203,7 +175,7 @@ const KINDS: { kind: FeederKind; label: string; hint: string }[] = [
   {
     kind: "aparelho",
     label: "Tenho um aparelho",
-    hint: "Você recebe o usuário e a senha para gravar no ESP32.",
+    hint: "O app mostra um código de 6 dígitos para digitar no comedouro.",
   },
   {
     kind: "simulado",
@@ -217,10 +189,7 @@ function AddFeeder(props: {
   hardware: boolean;
   cancelable: boolean;
   onCancel: () => void;
-  onCreated: (result: {
-    comedouro: FeederSummary;
-    credencial: DeviceCredential | null;
-  }) => Promise<void>;
+  onCreated: (result: { comedouro: FeederSummary }) => Promise<void>;
 }) {
   const [apelido, setApelido] = useState("");
   const [kind, setKind] = useState<FeederKind>(
@@ -329,35 +298,5 @@ function AddFeeder(props: {
         )}
       </div>
     </Card>
-  );
-}
-
-// A senha do aparelho aparece uma vez só: o servidor guarda apenas o hash dela.
-function NewDeviceCredential(props: {
-  apelido: string;
-  credencial: DeviceCredential;
-  onClose: () => void;
-}) {
-  return (
-    <Notice
-      tone="ok"
-      title={`${props.apelido} foi adicionado`}
-      action={
-        <button type="button" className="button" onClick={props.onClose}>
-          Já anotei
-        </button>
-      }
-    >
-      Grave estes dados no ESP32 (ou use no simulador). A senha não aparece de
-      novo.
-      <span className="credential">
-        <span>
-          Usuário: <code>{props.credencial.usuario}</code>
-        </span>
-        <span>
-          Senha: <code>{props.credencial.senha}</code>
-        </span>
-      </span>
-    </Notice>
   );
 }

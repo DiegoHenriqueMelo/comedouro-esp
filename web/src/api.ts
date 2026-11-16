@@ -25,7 +25,12 @@ export type FeederSummary = {
   criadoEm: string;
   online: boolean;
   alertas: number;
+  // Aparelho que ainda não trocou o código pela senha. Simulado está sempre pareado.
+  pareado: boolean;
 };
+
+// O código de 6 dígitos que a pessoa digita no portal Wi-Fi do comedouro.
+export type PairingCode = { codigo: string; expiraEm: string };
 
 export type Species = "gato" | "cachorro";
 
@@ -43,13 +48,12 @@ export type Pet = {
 
 export type PetInput = Omit<Pet, "id" | "foto" | "criadoEm">;
 
-// O usuário e a senha MQTT de um aparelho novo: o servidor mostra uma vez só.
-export type DeviceCredential = { usuario: string; senha: string };
-
 export type Status = {
   hora: string;
   apelido: string;
   tipo: FeederKind;
+  pareado: boolean;
+  pareadoEm: string | null;
   online: boolean;
   onlineDesde: string | null;
   estado: "ocioso" | "servindo" | "vazio" | null;
@@ -173,7 +177,7 @@ export const api = {
       "/comedouros",
     ),
   createFeeder: (apelido: string, tipo: FeederKind) =>
-    request<{ comedouro: FeederSummary; credencial: DeviceCredential | null }>(
+    request<{ comedouro: FeederSummary; codigo: PairingCode | null }>(
       "POST",
       "/comedouros",
       { apelido, tipo },
@@ -181,6 +185,10 @@ export const api = {
   renameFeeder: (id: string, apelido: string) =>
     request<FeederSummary>("PATCH", feeder(id), { apelido }),
   removeFeeder: (id: string) => request<null>("DELETE", feeder(id)),
+  pairingCode: (id: string) =>
+    request<{ codigo: PairingCode | null }>("GET", `${feeder(id)}/codigo`),
+  newPairingCode: (id: string) =>
+    request<{ codigo: PairingCode }>("POST", `${feeder(id)}/codigo`),
 
   // Um comedouro.
   status: (id: string) => request<Status>("GET", `${feeder(id)}/status`),

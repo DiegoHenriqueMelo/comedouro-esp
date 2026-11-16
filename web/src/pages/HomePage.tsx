@@ -20,6 +20,7 @@ import {
   StateLine,
   Stepper,
 } from "../ui";
+import { PairingBlock } from "./Pairing";
 
 // A tela inicial segue a hierarquia do guia: "está tudo bem?", depois a ação, depois os números.
 export function HomePage(props: { feederId: string }) {
@@ -36,6 +37,21 @@ export function HomePage(props: { feederId: string }) {
   }
 
   const s = status.data;
+
+  // Aparelho ainda não pareado: a tela inteira é o código (guia de UI/UX, seção 6: o que fazer agora).
+  if (!s.pareado) {
+    return (
+      <>
+        <header className="page-header">
+          <h1>{s.apelido}</h1>
+          <StateLine tone="warn">Esperando pareamento</StateLine>
+        </header>
+        <p className="situation">Falta ligar o comedouro ao Wi-Fi da casa.</p>
+        <PairingBlock feederId={props.feederId} />
+      </>
+    );
+  }
+
   return (
     <>
       <header className="page-header">
