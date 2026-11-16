@@ -18,6 +18,12 @@ export type CodigoDeErro =
   | "limite_de_comedouros"
   | "limite_de_simulados"
   | "aparelho_indisponivel"
+  | "nome_do_pet_invalido"
+  | "especie_invalida"
+  | "nascimento_invalido"
+  | "peso_invalido"
+  | "limite_de_pets"
+  | "foto_invalida"
   | "conflito_de_versao";
 
 export class ErroDeDominio extends Error {

@@ -1,5 +1,6 @@
 import { AuthService } from "./application/auth-service.js";
 import { FeederCatalog } from "./application/feeder-catalog.js";
+import { PetService } from "./application/pet-service.js";
 import type {
   Clock,
   DeviceCredentialRepository,
@@ -7,6 +8,8 @@ import type {
   FeederProfileRepository,
   FeederStorage,
   IdentityVerifier,
+  PetPhotoRepository,
+  PetRepository,
   SessionRepository,
   UserNotifier,
   UserRepository,
@@ -26,6 +29,8 @@ export type SystemParts = {
   clock: Clock;
   users: UserRepository;
   sessions: SessionRepository;
+  pets: PetRepository;
+  petPhotos: PetPhotoRepository;
   // null quando o login com Google não foi configurado.
   identityVerifier: IdentityVerifier | null;
   log?: Log;
@@ -52,5 +57,7 @@ export function buildSystem(parts: SystemParts) {
     parts.clock,
   );
 
-  return { catalog, auth };
+  const pets = new PetService(parts.pets, parts.petPhotos, parts.clock);
+
+  return { catalog, auth, pets };
 }

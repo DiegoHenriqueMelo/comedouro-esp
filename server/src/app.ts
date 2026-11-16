@@ -15,6 +15,7 @@ import {
   requireUser,
   toUserDto,
 } from "./http/auth-routes.js";
+import { registerPetRoutes } from "./http/pet-routes.js";
 import { type PushDeps, registerRoutes } from "./http/routes.js";
 
 export type AppOptions = {
@@ -56,6 +57,9 @@ export function buildApp(options: AppOptions) {
       });
     }
     const statusCode = (error as { statusCode?: number }).statusCode;
+    if (statusCode === 413) {
+      return reply.code(413).send({ motivo: "grande_demais" });
+    }
     if (statusCode !== undefined && statusCode >= 400 && statusCode < 500) {
       return reply.code(statusCode).send({ motivo: "requisicao_invalida" });
     }
@@ -85,6 +89,7 @@ export function buildApp(options: AppOptions) {
         await privateScope.register(
           registerRoutes(options.system, options.push),
         );
+        await privateScope.register(registerPetRoutes(options.system.pets));
       });
     },
     { prefix: "/v1" },

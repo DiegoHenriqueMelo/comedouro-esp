@@ -1,4 +1,4 @@
-import { type Collection, type Db, MongoServerError } from "mongodb";
+import { Binary, type Collection, type Db, MongoServerError } from "mongodb";
 import {
   type ConfigDto,
   fromConfigDto,
@@ -19,6 +19,8 @@ import type {
   FeederRepositories,
   FeederRepository,
   FeederStorage,
+  PetPhotoRepository,
+  PetRepository,
   PushSubscription,
   PushSubscriptionRepository,
   Session,
@@ -35,6 +37,8 @@ import {
   FeederProfile,
   type FeederProfileProps,
 } from "../../domain/feeder/feeder-profile.js";
+import { Pet, type PetProps } from "../../domain/pet/pet.js";
+import type { PetPhoto, PhotoType } from "../../domain/pet/pet-photo.js";
 import { ErroDeDominio } from "../../domain/shared/erro-de-dominio.js";
 import { User, type UserProps } from "../../domain/user/user.js";
 
@@ -473,5 +477,70 @@ export class MongoDeviceCredentialRepository
 
   async removeByFeeder(feederId: string): Promise<void> {
     await this.collection.deleteMany({ feederId });
+  }
+}
+
+type PetDoc = Omit<PetProps, "id"> & { _id: string };
+
+export class MongoPetRepository implements PetRepository {
+  private readonly collection: Collection<PetDoc>;
+
+  constructor(db: Db) {
+    this.collection = db.collection<PetDoc>("pets");
+  }
+
+  async ensureIndexes(): Promise<void> {
+    await this.collection.createIndex({ ownerId: 1 });
+  }
+
+  async findById(id: string): Promise<Pet | null> {
+    const doc = await this.collection.findOne({ _id: id });
+    return doc ? toPet(doc) : null;
+  }
+
+  async listByOwner(ownerId: string): Promise<Pet[]> {
+    return (await this.collection.find({ ownerId }).toArray()).map(toPet);
+  }
+
+  async save(pet: Pet): Promise<void> {
+    const { id, ...rest } = pet.toProps();
+    await this.collection.replaceOne({ _id: id }, rest, { upsert: true });
+  }
+
+  async remove(id: string): Promise<void> {
+    await this.collection.deleteOne({ _id: id });
+  }
+}
+
+function toPet(doc: PetDoc): Pet {
+  const { _id, ...rest } = doc;
+  return Pet.restore({ id: _id, ...rest });
+}
+
+type PhotoDoc = { _id: string; contentType: PhotoType; data: Binary };
+
+export class MongoPetPhotoRepository implements PetPhotoRepository {
+  private readonly collection: Collection<PhotoDoc>;
+
+  constructor(db: Db) {
+    this.collection = db.collection<PhotoDoc>("pet_photos");
+  }
+
+  async get(petId: string): Promise<PetPhoto | null> {
+    const doc = await this.collection.findOne({ _id: petId });
+    if (!doc) return null;
+    return { contentType: doc.contentType, data: Buffer.from(doc.data.buffer) };
+  }
+
+  async save(petId: string, photo: PetPhoto): Promise<void> {
+    await this.collection.replaceOne(
+      { _id: petId },
+      { contentType: photo.contentType, data: new Binary(photo.data) },
+      { upsert: true },
+    );
+  }
+
+  async remove(petId: string): Promise<void> {
+    await this.collection.deleteOne({ _id: petId });
   }
 }

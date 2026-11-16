@@ -9,6 +9,8 @@ import type {
   FeederProfileRepository,
   FeederRepository,
   FeederStorage,
+  PetPhotoRepository,
+  PetRepository,
   PushSubscriptionRepository,
   SessionRepository,
   UserRepository,
@@ -16,6 +18,7 @@ import type {
 import type { DeviceEvent } from "../domain/device/device.js";
 import { Feeder } from "../domain/feeder/feeder.js";
 import { FeederProfile } from "../domain/feeder/feeder-profile.js";
+import { Pet } from "../domain/pet/pet.js";
 import { User } from "../domain/user/user.js";
 import {
   MemoryAlertRepository,
@@ -25,6 +28,8 @@ import {
   MemoryFeederProfileRepository,
   MemoryFeederRepository,
   MemoryFeederStorage,
+  MemoryPetPhotoRepository,
+  MemoryPetRepository,
   MemoryPushSubscriptionRepository,
   MemorySessionRepository,
   MemoryUserRepository,
@@ -37,6 +42,8 @@ import {
   MongoFeederProfileRepository,
   MongoFeederRepository,
   MongoFeederStorage,
+  MongoPetPhotoRepository,
+  MongoPetRepository,
   MongoPushSubscriptionRepository,
   MongoSessionRepository,
   MongoUserRepository,
@@ -56,6 +63,8 @@ type Repositories = {
   profiles: FeederProfileRepository;
   credentials: DeviceCredentialRepository;
   storage: FeederStorage;
+  pets: PetRepository;
+  photos: PetPhotoRepository;
 };
 
 const cafe = fromScheduleDto([{ hora: "07:30", porcoes: 2, ativo: true }]);
@@ -301,6 +310,51 @@ function contract(name: string, create: () => Promise<Repositories>) {
       });
     });
 
+    describe("pets", () => {
+      const pet = (id: string, ownerId: string) =>
+        Pet.create(
+          { id, ownerId, createdAt: at(0) },
+          {
+            name: `Pet ${id}`,
+            species: "gato",
+            birthDate: "2023-05-10",
+            weightKg: 4.2,
+          },
+          "2026-11-16",
+        );
+
+      it("lista por dono, acha por id, substitui e remove", async () => {
+        await r.pets.save(pet("p1", "u1"));
+        await r.pets.save(pet("p2", "u1"));
+        await r.pets.save(pet("p3", "u2"));
+
+        const meus = await r.pets.listByOwner("u1");
+        expect(meus.map((p) => p.id).sort()).toEqual(["p1", "p2"]);
+
+        const p1 = pet("p1", "u1");
+        p1.photoChanged(7);
+        await r.pets.save(p1);
+        expect((await r.pets.findById("p1"))?.toProps()).toEqual(p1.toProps());
+
+        await r.pets.remove("p1");
+        expect(await r.pets.findById("p1")).toBeNull();
+      });
+
+      it("guarda a foto com o tipo e os bytes iguais", async () => {
+        const photo = {
+          contentType: "image/jpeg" as const,
+          data: Buffer.from([0xff, 0xd8, 0xff, 1, 2, 3]),
+        };
+        await r.photos.save("p1", photo);
+
+        expect(await r.photos.get("p1")).toEqual(photo);
+        expect(await r.photos.get("p2")).toBeNull();
+
+        await r.photos.remove("p1");
+        expect(await r.photos.get("p1")).toBeNull();
+      });
+    });
+
     describe("dados por comedouro", () => {
       it("cada comedouro tem os seus, e apagar um não mexe no outro", async () => {
         const a = r.storage.forFeeder("a");
@@ -385,6 +439,8 @@ contract("memória", async () => ({
   profiles: new MemoryFeederProfileRepository(),
   credentials: new MemoryDeviceCredentialRepository(),
   storage: new MemoryFeederStorage(),
+  pets: new MemoryPetRepository(),
+  photos: new MemoryPetPhotoRepository(),
 }));
 
 // Os testes do MongoDB precisam de um banco no ar: `docker compose up -d mongo` na raiz do repo.
@@ -447,6 +503,8 @@ describe.skipIf(!(await mongoIsUp()))("MongoDB", () => {
       profiles: new MongoFeederProfileRepository(db),
       credentials: new MongoDeviceCredentialRepository(db),
       storage,
+      pets: new MongoPetRepository(db),
+      photos: new MongoPetPhotoRepository(db),
     };
   });
 });

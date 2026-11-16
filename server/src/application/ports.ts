@@ -10,6 +10,8 @@ import type {
   FeederKind,
   FeederProfile,
 } from "../domain/feeder/feeder-profile.js";
+import type { Pet } from "../domain/pet/pet.js";
+import type { PetPhoto } from "../domain/pet/pet-photo.js";
 import type { Identity, User } from "../domain/user/user.js";
 import type { ConfigPayload } from "./dto.js";
 
@@ -154,6 +156,21 @@ export interface DeviceFactory {
   // false quando o servidor não tem broker MQTT: aí só dá para criar comedouros simulados.
   readonly supportsHardware: boolean;
   create(feederId: string, kind: FeederKind): DeviceHandle;
+}
+
+export interface PetRepository {
+  findById(id: string): Promise<Pet | null>;
+  listByOwner(ownerId: string): Promise<Pet[]>;
+  // Cria ou substitui.
+  save(pet: Pet): Promise<void>;
+  remove(id: string): Promise<void>;
+}
+
+// A foto fica separada do pet: listar os pets não carrega as imagens.
+export interface PetPhotoRepository {
+  get(petId: string): Promise<PetPhoto | null>;
+  save(petId: string, photo: PetPhoto): Promise<void>;
+  remove(petId: string): Promise<void>;
 }
 
 // Confere a credencial que o app recebeu do Google. Devolve null se ela for falsa, vencida ou de outro app.

@@ -6,6 +6,8 @@ import type {
   DeviceCredentialRepository,
   FeederProfileRepository,
   FeederStorage,
+  PetPhotoRepository,
+  PetRepository,
   PushSubscriptionRepository,
   SessionRepository,
   UserNotifier,
@@ -23,6 +25,8 @@ import {
   MemoryDeviceCredentialRepository,
   MemoryFeederProfileRepository,
   MemoryFeederStorage,
+  MemoryPetPhotoRepository,
+  MemoryPetRepository,
   MemoryPushSubscriptionRepository,
   MemorySessionRepository,
   MemoryUserRepository,
@@ -32,6 +36,8 @@ import {
   MongoDeviceCredentialRepository,
   MongoFeederProfileRepository,
   MongoFeederStorage,
+  MongoPetPhotoRepository,
+  MongoPetRepository,
   MongoPushSubscriptionRepository,
   MongoSessionRepository,
   MongoUserRepository,
@@ -61,6 +67,8 @@ let credentials: DeviceCredentialRepository;
 let subscriptions: PushSubscriptionRepository;
 let users: UserRepository;
 let sessions: SessionRepository;
+let pets: PetRepository;
+let petPhotos: PetPhotoRepository;
 
 if (config.mongo) {
   mongo = new MongoClient(config.mongo.url, { serverSelectionTimeoutMS: 8000 });
@@ -73,6 +81,7 @@ if (config.mongo) {
   const mongoSubscriptions = new MongoPushSubscriptionRepository(db);
   const mongoUsers = new MongoUserRepository(db);
   const mongoSessions = new MongoSessionRepository(db);
+  const mongoPets = new MongoPetRepository(db);
   for (const repository of [
     mongoStorage,
     mongoProfiles,
@@ -80,6 +89,7 @@ if (config.mongo) {
     mongoSubscriptions,
     mongoUsers,
     mongoSessions,
+    mongoPets,
   ]) {
     await repository.ensureIndexes();
   }
@@ -90,6 +100,8 @@ if (config.mongo) {
   subscriptions = mongoSubscriptions;
   users = mongoUsers;
   sessions = mongoSessions;
+  pets = mongoPets;
+  petPhotos = new MongoPetPhotoRepository(db);
   log.info({ db: config.mongo.db }, "banco: MongoDB");
 } else {
   storage = new MemoryFeederStorage();
@@ -98,6 +110,8 @@ if (config.mongo) {
   subscriptions = new MemoryPushSubscriptionRepository();
   users = new MemoryUserRepository();
   sessions = new MemorySessionRepository();
+  pets = new MemoryPetRepository();
+  petPhotos = new MemoryPetPhotoRepository();
   log.warn("banco: memória (sem MONGO_URL). Os dados somem ao reiniciar.");
 }
 
@@ -167,6 +181,8 @@ const system = buildSystem({
   clock,
   users,
   sessions,
+  pets,
+  petPhotos,
   identityVerifier,
   log,
 });

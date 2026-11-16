@@ -19,6 +19,8 @@ import type {
   FeederRepository,
   FeederStorage,
   IdentityVerifier,
+  PetPhotoRepository,
+  PetRepository,
   PushSubscription,
   PushSubscriptionRepository,
   Session,
@@ -32,6 +34,8 @@ import {
   FeederProfile,
   type FeederProfileProps,
 } from "../../domain/feeder/feeder-profile.js";
+import { Pet, type PetProps } from "../../domain/pet/pet.js";
+import type { PetPhoto } from "../../domain/pet/pet-photo.js";
 import { ErroDeDominio } from "../../domain/shared/erro-de-dominio.js";
 import { type Identity, User } from "../../domain/user/user.js";
 
@@ -310,3 +314,47 @@ export class FixedClock {
 }
 
 export const systemClock = { now: () => new Date() };
+
+export class MemoryPetRepository implements PetRepository {
+  private readonly byId = new Map<string, PetProps>();
+
+  async findById(id: string): Promise<Pet | null> {
+    const props = this.byId.get(id);
+    return props ? Pet.restore(props) : null;
+  }
+
+  async listByOwner(ownerId: string): Promise<Pet[]> {
+    return [...this.byId.values()]
+      .filter((p) => p.ownerId === ownerId)
+      .map((p) => Pet.restore(p));
+  }
+
+  async save(pet: Pet): Promise<void> {
+    this.byId.set(pet.id, pet.toProps());
+  }
+
+  async remove(id: string): Promise<void> {
+    this.byId.delete(id);
+  }
+}
+
+export class MemoryPetPhotoRepository implements PetPhotoRepository {
+  private readonly byPet = new Map<string, PetPhoto>();
+
+  async get(petId: string): Promise<PetPhoto | null> {
+    const photo = this.byPet.get(petId);
+    return photo ? { ...photo, data: Buffer.from(photo.data) } : null;
+  }
+
+  async save(petId: string, photo: PetPhoto): Promise<void> {
+    this.byPet.set(petId, { ...photo, data: Buffer.from(photo.data) });
+  }
+
+  async remove(petId: string): Promise<void> {
+    this.byPet.delete(petId);
+  }
+
+  has(petId: string): boolean {
+    return this.byPet.has(petId);
+  }
+}

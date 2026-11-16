@@ -11,6 +11,8 @@ import {
   MemoryFeederProfileRepository,
   MemoryFeederStorage,
   MemoryNotifier,
+  MemoryPetPhotoRepository,
+  MemoryPetRepository,
   MemoryPushSubscriptionRepository,
   MemorySessionRepository,
   MemoryUserRepository,
@@ -56,6 +58,8 @@ export async function buildTestSystem(
   const google = new FakeIdentityVerifier();
   const users = new MemoryUserRepository();
   const sessions = new MemorySessionRepository();
+  const pets = new MemoryPetRepository();
+  const petPhotos = new MemoryPetPhotoRepository();
 
   const system = buildSystem({
     profiles,
@@ -66,6 +70,8 @@ export async function buildTestSystem(
     clock,
     users,
     sessions,
+    pets,
+    petPhotos,
     identityVerifier: google,
   });
 
@@ -108,6 +114,8 @@ export async function buildTestSystem(
     notifier,
     subscriptions,
     google,
+    pets,
+    petPhotos,
     users,
     sessions,
     user,
