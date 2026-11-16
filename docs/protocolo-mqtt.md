@@ -3,12 +3,46 @@
 > O contrato entre o servidor e o alimentador. O firmware (marco M6 do [plano](PLANO-DE-ACAO.md)) precisa seguir este documento.
 > A fonte da verdade é o código: [`server/src/infra/mqtt/protocol.ts`](../server/src/infra/mqtt/protocol.ts). O "ESP32 de mentira" ([`server/src/simulator/mqtt-simulator.ts`](../server/src/simulator/mqtt-simulator.ts)) é uma implementação completa do lado do dispositivo e serve de referência.
 
+## Pareamento
+
+Antes do MQTT, o aparelho precisa de um usuário e de uma senha. Ele consegue os dois trocando o **código de pareamento** que a pessoa vê no app.
+
+**Do lado da pessoa:** no app, ela adiciona um comedouro do tipo "Tenho um aparelho". A tela inicial dele mostra um código de 6 dígitos ("482 913"), que vale **10 minutos** e serve **uma vez**.
+
+**Do lado do ESP32** (itens F2, F3 e F6 do [roteiro do produto](ROTEIRO-PRODUTO.md)):
+
+1. **Sem credencial guardada**, o ESP32 abre uma rede Wi-Fi própria, `Comedouro-XXXX`, com uma página de configuração (portal cativo). A página pede: a rede Wi-Fi da casa, a senha dela, o endereço do servidor e o código de pareamento.
+2. Já conectado ao Wi-Fi da casa, ele chama:
+   ```
+   POST <servidor>/v1/dispositivos/parear
+   Content-Type: application/json
+
+   { "codigo": "482913" }
+   ```
+   Espaços e traços no código são ignorados. O pedido não leva sessão nem cookie.
+3. **Resposta 200:**
+   ```json
+   { "comedouro": "5eb1b5d4-…", "usuario": "5eb1b5d4-…", "senha": "k8rJ-s6B9…", "mqtt": { "porta": 1883 } }
+   ```
+   O ESP32 guarda o `usuario` e a `senha` na memória permanente (NVS) e conecta no broker: mesmo endereço do servidor, na porta `mqtt.porta`. O `<id>` dos tópicos é o `comedouro` (o mesmo texto do `usuario`).
+4. **Respostas de erro:**
+
+| Status | Corpo | O que fazer |
+|---|---|---|
+| 422 | `{ "motivo": "codigo_invalido" }` | Código errado, vencido ou já usado (o servidor não diz qual). Pedir outro código na página |
+| 429 | `{ "motivo": "muitas_tentativas" }` | 5 códigos errados deste IP em 10 minutos. Esperar 10 minutos |
+| 400 | `{ "motivo": "texto_invalido" }` ou `"requisicao_invalida"` | O corpo não é JSON em UTF-8, ou falta o `codigo` |
+
+**Parear de novo.** Em Ajustes, "Parear de novo" gera um código novo. Quando um aparelho usa esse código, o servidor troca a senha e derruba o aparelho que estava conectado. A agenda, os ajustes e o histórico continuam. Serve para um ESP32 resetado ou trocado.
+
+**Voltar ao pareamento** (F6). O ESP32 apaga a credencial e volta ao passo 1 em dois casos: o broker recusa a senha (CONNACK 4 ou 5: o comedouro foi removido, ou pareado em outro aparelho), ou o botão de reset fica apertado por 10 segundos.
+
 ## Conexão
 
 | Item | Valor |
 |---|---|
-| Broker | A máquina do servidor, porta `MQTT_BROKER_PORT` (padrão 1883) |
-| Usuário e senha | Os do comedouro: o app mostra uma vez, ao criar um comedouro do tipo "Tenho um aparelho" |
+| Broker | A máquina do servidor, na porta que o pareamento devolveu (`mqtt.porta`, padrão 1883) |
+| Usuário e senha | Os que o pareamento devolveu |
 | `<id>` | O id do comedouro. É o mesmo texto do usuário |
 | Client id do dispositivo | Qualquer um que não seja o do servidor. Sugestão: `alimentador-<id>` |
 | Client id do servidor | `servidor-<id>` |
@@ -18,7 +52,7 @@ Quem abre a conexão é sempre o ESP32. O servidor nunca procura o dispositivo.
 
 **Cada aparelho só enxerga o próprio comedouro.** O broker recusa publicar ou assinar qualquer tópico fora de `alimentador/<id>/`. Assinar `#` ou `alimentador/+/...` também é recusado.
 
-**Credencial recusada quer dizer "comedouro removido".** Quando a pessoa remove o comedouro no app, o servidor apaga a senha e derruba o aparelho. Ao tentar voltar, o broker responde "não autorizado" (CONNACK 4 ou 5). O firmware, nesse caso, para de tentar e volta ao modo de pareamento (item F6 do [roteiro do produto](ROTEIRO-PRODUTO.md)).
+**Credencial recusada quer dizer "volte ao pareamento".** O comedouro foi removido no app, ou foi pareado em outro aparelho. O broker responde "não autorizado" (CONNACK 4 ou 5), e o firmware para de tentar e volta ao modo de pareamento (seção Pareamento, acima).
 
 ## Tópicos
 
@@ -181,7 +215,7 @@ O servidor abre e fecha os alertas a partir daqui: garrafa abaixo de 20%, sensor
 ## Como testar o firmware contra o servidor
 
 1. Suba o servidor com o broker (seção 3 do [guia](GUIA.md)).
-2. No app, crie um comedouro do tipo "Tenho um aparelho" e anote o usuário e a senha.
-3. Rode `SIM_USUARIO=<usuário> SIM_SENHA=<senha> pnpm simulador` em `server/` e observe a conversa no log: é o comportamento esperado.
-4. Pare o simulador, ligue a placa com a mesma credencial e confira no app: deve aparecer "Online" e "Configuração sincronizada".
+2. No app, crie um comedouro do tipo "Tenho um aparelho": a tela dele mostra o código.
+3. Rode `SIM_CODIGO=<código> pnpm simulador` em `server/` e observe a conversa no log: o pareamento por HTTP e depois o MQTT. É o comportamento esperado.
+4. Para a placa: gere outro código (Ajustes → Parear de novo), pareie a placa com ele e confira no app: deve aparecer "Online" e "Configuração sincronizada". O simulador, que perdeu a senha, é derrubado.
 5. Os testes em [`mqtt.integration.test.ts`](../server/src/infra/mqtt/mqtt.integration.test.ts) descrevem os casos que o firmware precisa cobrir: receber a configuração retida, responder ao servir, cair sem avisar e completar o histórico depois que o servidor volta.

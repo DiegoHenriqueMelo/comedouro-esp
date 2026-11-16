@@ -22,8 +22,8 @@ Cada pessoa entra com a conta dela e tem os próprios comedouros (até 10). Um c
 | Tipo | Para quê | O que precisa |
 |---|---|---|
 | **Simulado** ("Experimentar sem aparelho") | Ver o app funcionando sem nenhuma peça. Um por conta | Nada |
-| **Aparelho**, com o `pnpm simulador` | Testar o caminho real (broker MQTT) sem a placa | `.env` com o broker, e o simulador rodando com a credencial do comedouro |
-| **Aparelho**, com o ESP32 | O uso de verdade | `.env` com o broker, e a placa com o firmware e a credencial |
+| **Aparelho**, com o `pnpm simulador` | Testar o caminho real (pareamento e broker MQTT) sem a placa | `.env` com o broker, e o simulador pareado com o código do comedouro |
+| **Aparelho**, com o ESP32 | O uso de verdade | `.env` com o broker, e a placa com o firmware, pareada com o código |
 
 ## 2. Começar em 2 minutos (modo demonstração)
 
@@ -154,16 +154,24 @@ Portas usadas na máquina: **3000** (app e API), **1883** (broker MQTT, para o E
 
 O simulador é um programa que se comporta como o ESP32: conecta no broker, recebe a configuração, roda a agenda e manda os eventos. Com o servidor no ar e o `.env` com o broker:
 
-1. No app, adicione um comedouro com o tipo **"Tenho um aparelho"** e anote o usuário e a senha que aparecem.
-2. Rode o simulador com eles:
+1. No app, adicione um comedouro com o tipo **"Tenho um aparelho"**. A tela dele mostra um código de 6 dígitos.
+2. Rode o simulador com o código, em até 10 minutos:
    ```
    cd server
    pnpm install
-   SIM_USUARIO=<usuário> SIM_SENHA=<senha> pnpm simulador
+   SIM_CODIGO=<código> pnpm simulador
    ```
-   No PowerShell: `$env:SIM_USUARIO="<usuário>"; $env:SIM_SENHA="<senha>"; pnpm simulador`.
+   No PowerShell: `$env:SIM_CODIGO="<código>"; pnpm simulador`.
 
-Ele lê a porta do broker do mesmo `.env`. No app, o comedouro passa a aparecer "Online". Se o comedouro for removido, o simulador é derrubado e avisa que a credencial foi recusada. No terminal do simulador, dá para mexer no "mundo físico":
+Ele pareia como o ESP32 vai parear e guarda o usuário e a senha em `server/.simulador.json` (fora do git). Das próximas vezes, basta `pnpm simulador`. No app, a tela do código vira a do comedouro funcionando. Se o comedouro for removido, ou pareado em outro aparelho, o simulador é derrubado, apaga o arquivo e pede um código novo, como o ESP32 vai fazer.
+
+| Variável | Padrão | Para quê |
+|---|---|---|
+| `SIM_CODIGO` | vazia | O código de pareamento. Sem ele, usa o `.simulador.json` |
+| `SIM_SERVIDOR` | `http://127.0.0.1:<PORT>` | Onde o servidor está, para parear |
+| `SIM_ARQUIVO` | `.simulador.json` | Onde guardar a credencial. Use um arquivo por simulador para rodar mais de um |
+
+No terminal do simulador, dá para mexer no "mundo físico": No terminal do simulador, dá para mexer no "mundo físico":
 
 | Digite | O que acontece |
 |---|---|
@@ -320,11 +328,11 @@ No iPhone, as notificações só funcionam com o app **instalado na tela inicial
 1. Deixe o servidor no modo com broker (seção 3.1).
 2. Descubra o IP da máquina do servidor na rede da casa e **reserve esse IP no roteador**: o ESP32 precisa achar o broker sempre no mesmo endereço.
 3. Libere as portas **1883** e **3000** no firewall da máquina para a rede local.
-4. No app, adicione um comedouro com o tipo **"Tenho um aparelho"**. No firmware, configure o IP da máquina, a porta 1883 e o usuário e a senha que o app mostrou. O usuário é também o id do comedouro nos tópicos MQTT.
+4. No app, adicione um comedouro com o tipo **"Tenho um aparelho"**. Ligue a placa: ela abre a rede Wi-Fi "Comedouro". Conecte o celular nela e, na página que abrir, informe o Wi-Fi da casa, a senha dele, o endereço do servidor e o código que o app mostra. O passo a passo do lado da placa está no [protocolo](protocolo-mqtt.md), seção Pareamento.
 5. O firmware segue o [protocolo MQTT](protocolo-mqtt.md). O simulador é a referência de comportamento.
 6. Ligue a placa. No app, deve aparecer "Online" e, no rodapé de Ajustes, "sincronizada".
 
-Não rode o simulador e a placa ao mesmo tempo com a mesma credencial: os dois responderiam aos mesmos comandos. Na etapa P4 do [roteiro do produto](ROTEIRO-PRODUTO.md), o usuário e a senha dão lugar a um código de pareamento de 6 dígitos.
+Para trocar a placa (ou o simulador por ela), use **Ajustes → Parear de novo**: o código novo troca a senha, e o aparelho antigo é derrubado. A agenda e os ajustes continuam.
 
 ## 8. Cópia de segurança
 
@@ -350,8 +358,9 @@ O backup não é automático. Se quiser um diário, agende o primeiro comando no
 |---|---|---|
 | O servidor não sobe e o log fala em `MQTT_USERNAME` | O `.env` tem `MQTT_BROKER_PORT` sem usuário ou senha | Preencher os três |
 | O app mostra "Simulado" e você queria o modo real | O `.env` está sem `MQTT_BROKER_PORT`, ou não foi aplicado | Conferir o `.env` e rodar `docker compose up -d` |
-| "Offline" com o simulador rodando | Usuário ou senha do comedouro errados, ou porta diferente | Conferir o `SIM_USUARIO` e o `SIM_SENHA`. Perdeu a senha? Remova o comedouro e crie de novo |
-| "Credencial recusada" no simulador | O comedouro foi removido no app | Criar outro comedouro e usar a credencial nova |
+| "O servidor recusou o código" no simulador | Código errado, vencido (10 min) ou já usado | Gerar outro na tela do comedouro e rodar de novo |
+| "Credencial recusada" no simulador | O comedouro foi removido, ou pareado em outro aparelho | Gerar um código (Ajustes → Parear de novo) e rodar com `SIM_CODIGO` |
+| Pareamento responde 429 | 5 códigos errados do mesmo IP em 10 minutos | Esperar 10 minutos |
 | "Offline" com a placa ligada | IP errado, firewall ou senha | Testar com o simulador em outra máquina da rede; conferir a seção 7 |
 | "Configuração pendente" que não some | O dispositivo está offline, ou não devolve a versão no estado | Conferir o `configVersao` no estado do firmware |
 | A porta 3000 ou 1883 já está em uso | Outro programa na mesma porta | Mudar o lado esquerdo do `ports` no `docker-compose.yml` |
@@ -376,7 +385,9 @@ O app usa esta API, em `/v1`. Todas as rotas, menos as de `/v1/sessao`, exigem o
 | Método e rota | O que faz |
 |---|---|
 | `GET /v1/comedouros` | Os comedouros da conta, com o estado de cada um, e se o servidor aceita aparelhos |
-| `POST /v1/comedouros` | Cria um. Corpo: `{ "apelido": "Cozinha", "tipo": "simulado" }` ou `"aparelho"`. Para aparelho, devolve `credencial: { usuario, senha }` uma vez só |
+| `POST /v1/comedouros` | Cria um. Corpo: `{ "apelido": "Cozinha", "tipo": "simulado" }` ou `"aparelho"`. Para aparelho, devolve `codigo: { codigo, expiraEm }` |
+| `GET` · `POST /v1/comedouros/:id/codigo` | O código de pareamento que ainda vale (ou `null`), ou um novo, que invalida o anterior |
+| `POST /v1/dispositivos/parear` | **Sem sessão**: é o aparelho que chama. Corpo: `{ "codigo": "482913" }`. Detalhes no [protocolo](protocolo-mqtt.md) |
 | `PATCH /v1/comedouros/:id` | Troca o apelido. Corpo: `{ "apelido": "Sala" }` |
 | `DELETE /v1/comedouros/:id` | Remove o comedouro e todos os dados dele, e apaga a credencial do aparelho |
 | `GET /v1/pets` · `POST /v1/pets` | Lista ou cadastra pets. Corpo: `{ "nome": "Mingau", "especie": "gato", "nascimento": "2023-05-10", "pesoKg": 4.2 }`; nascimento e peso podem ser `null` |
@@ -410,6 +421,7 @@ As rotas abaixo são de um comedouro e começam com `/v1/comedouros/:id`. Comedo
 | 403 | O pedido veio de outro site (proteção contra CSRF) |
 | 404 | O comedouro ou o pet não existe, ou é de outra conta |
 | 413 | A foto passou de 150 KB |
+| 429 | No pareamento: 5 códigos errados do mesmo IP em 10 minutos |
 | 415 | A foto não é JPEG, PNG nem WebP |
 | 409 | O alimentador está ocupado, ou duas edições ao mesmo tempo |
 | 422 | Uma regra recusou. O corpo traz `motivo` e `mensagem` |
@@ -438,6 +450,7 @@ As rotas abaixo são de um comedouro e começam com `/v1/comedouros/:id`. Comedo
 | Docker | O compose inteiro, com o simulador conectado de fora e o servidor reiniciado no meio |
 | Login | Testes automáticos (sessão, renovação, saída, 401, CSRF) e o servidor no ar com "Entrar como dev". O login com uma conta Google de verdade ainda não foi feito: depende do `GOOGLE_CLIENT_ID` |
 | Pets | Testes automáticos (regras, limite, foto, 404 para os de outra conta) e o app de verdade no Chrome: o cadastro com foto escolhida pelo campo de arquivo, reduzida no navegador (uma imagem de 512 px chegou como JPEG de 11 KB) |
+| Pareamento | Testes automáticos (código de uso único, vencimento, limite por IP, parear de novo) e o servidor no ar: o `pnpm simulador` pareou com o código mostrado no app, que mudou sozinho para o comedouro online; depois, um segundo pareamento derrubou o simulador, que apagou a senha guardada |
 | Vários comedouros | Testes automáticos (cada conta só vê os seus, 404 para os de outra, limites, remoção) e o servidor no ar com o broker: o `pnpm simulador` entrou com a credencial do comedouro, serviu, e foi derrubado e recusado depois da remoção |
 
-São 292 testes no servidor (24 deles precisam do MongoDB no ar) e 73 no app.
+São 318 testes no servidor (27 deles precisam do MongoDB no ar) e 84 no app.

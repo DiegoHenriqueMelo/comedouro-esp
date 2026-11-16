@@ -4,7 +4,7 @@
 > Continua o [ROTEIRO-SISTEMA.md](ROTEIRO-SISTEMA.md) (E0–E13). As decisões vieram de um grill em 16/11/2026.
 > **Formato:** o Claude implementa o servidor e o PWA com TDD, uma etapa por vez, com commit e explicação ao fim de cada uma. O firmware (seção 6) é seu, com mentoria no método do [mentoria.md](mentoria.md). Toda tela nova segue o [UI-UX.md](UI-UX.md).
 >
-> **Progresso (16/11/2026):** P1, P2 e P3 concluídas (da P1, falta só você testar com uma conta Google de verdade). 292 testes no servidor e 73 no app.
+> **Progresso (16/11/2026):** P1 a P4 concluídas (da P1, falta só você testar com uma conta Google de verdade). 318 testes no servidor e 84 no app.
 
 ---
 
@@ -107,7 +107,7 @@ Todas as rotas (menos login e pareamento) exigem sessão. As rotas de hoje passa
 | P1 | Contas: login com Google, sessão, dono | 6–8 | ✅ Concluída. Falta o teste com o seu Client ID |
 | P2 | Vários comedouros: apelido, rotas por comedouro, broker por aparelho | 8–12 | ✅ Concluída |
 | P3 | Pets | 4–6 | ✅ Concluída |
-| P4 | Pareamento e comedouro simulado | 6–8 | ⬜ |
+| P4 | Pareamento e comedouro simulado | 6–8 | ✅ Concluída |
 | P5 | Dashboard, previsão, pausa e copiar agenda | 6–10 | ⬜ |
 | P6 | Excluir conta e dados | 2–3 | ⬜ |
 | P7 | Deploy na VPS | 4–8 | ⬜ |
@@ -172,15 +172,22 @@ Todas as rotas (menos login e pareamento) exigem sessão. As rotas de hoje passa
 
 **Objetivo:** um comedouro novo entra na conta sem ninguém mexer no código.
 
-- [ ] "Adicionar comedouro" pergunta o apelido e o tipo:
+> ✅ **Concluída em 16/11/2026.** Diferenças:
+> - **"O código morre depois de 5 erros" virou um limite por IP**: 5 códigos errados em 10 minutos e aquele IP fica bloqueado (429) até a janela passar. Um código errado não diz qual código a pessoa queria, então não dá para "matar" um código específico.
+> - **O comedouro simulado já existia** desde a P2; aqui ele só ganhou o `pareado: true` fixo.
+> - **"Parear de novo"** (Ajustes) troca a senha e derruba o aparelho antigo, sem mexer na agenda, nos ajustes nem no histórico.
+> - **O `pnpm simulador`** pareia por `SIM_CODIGO` e guarda a senha em `.simulador.json`, como o ESP32 vai guardar na NVS. Se o broker recusar a senha, ele apaga o arquivo e pede outro código (o F6).
+> - **A tela do código** é o próprio Início do comedouro enquanto ele não pareia, e muda sozinha quando o aparelho conecta.
+
+- [x] "Adicionar comedouro" pergunta o apelido e o tipo:
   - **Tenho um aparelho:** cria o comedouro "aguardando pareamento" e mostra o código de 6 dígitos com a contagem de 10 min e o botão "Gerar outro"
   - **Experimentar sem aparelho:** cria o comedouro simulado, já online, com a etiqueta "Simulado" (máx. 1 por conta)
-- [ ] `POST /v1/dispositivos/parear { codigo }`: devolve `{ feederId, mqttHost, mqttPort, usuario, senha }` uma única vez, guarda só o hash da senha e marca o código como usado
-- [ ] Limite de tentativas por IP e por código (D14)
-- [ ] A tela do código percebe sozinha quando o aparelho conecta e mostra "Pareado"
-- [ ] O simulador de processo (`pnpm simulador`) passa a parear pelo código, como o ESP32 fará; é ele que testa o fluxo inteiro
-- [ ] Remover comedouro (D15): apaga credenciais, derruba a conexão e limpa as mensagens retidas
-- [ ] [protocolo-mqtt.md](protocolo-mqtt.md) ganha a seção "Pareamento"
+- [x] `POST /v1/dispositivos/parear { codigo }`: devolve `{ feederId, mqttHost, mqttPort, usuario, senha }` uma única vez, guarda só o hash da senha e marca o código como usado
+- [x] Limite de tentativas por IP e por código (D14)
+- [x] A tela do código percebe sozinha quando o aparelho conecta e mostra "Pareado"
+- [x] O simulador de processo (`pnpm simulador`) passa a parear pelo código, como o ESP32 fará; é ele que testa o fluxo inteiro
+- [x] Remover comedouro (D15): apaga credenciais, derruba a conexão e limpa as mensagens retidas
+- [x] [protocolo-mqtt.md](protocolo-mqtt.md) ganha a seção "Pareamento"
 
 **Testes primeiro:** código vencido, usado ou errado → recusa sem dizer qual dos três; 6ª tentativa → bloqueado; credencial de comedouro removido → broker recusa.
 
@@ -236,7 +243,7 @@ O servidor fica pronto antes, e o simulador mostra o caminho. Cada item segue a 
 | # | Entrega | Depende de |
 |---|---|---|
 | F1 | Cliente MQTT seguindo o [protocolo](protocolo-mqtt.md): `config`, `sync`, `cmd`, `evento`, `estado`, `online` (sem TLS, contra o servidor local) | — |
-| F2 | Portal Wi-Fi: sem Wi-Fi salvo, o ESP32 abre a rede "Comedouro-XXXX" com uma página que pede rede, senha e código | — |
+| F2 | Portal Wi-Fi: sem credencial salva, o ESP32 abre a rede "Comedouro-XXXX" com uma página que pede a rede, a senha dela, o endereço do servidor e o código ([protocolo](protocolo-mqtt.md), seção Pareamento) | — |
 | F3 | Pareamento: chama `POST /v1/dispositivos/parear` por HTTPS e guarda `feederId`, usuário e senha na memória permanente (NVS) | P4 |
 | F4 | MQTT com TLS na 8883 (certificado raiz da Let's Encrypt embutido) | P7 |
 | F5 | Respeitar a `pausa` da configuração (a agenda para, o "servir agora" não) | P5 |

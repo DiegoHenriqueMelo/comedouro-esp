@@ -10,7 +10,7 @@
 
 | Termo | Definição | Tipo | Observação |
 |---|---|---|---|
-| Alimentador | O comedouro como o servidor o enxerga: a configuração e a agenda de um aparelho, e as regras que valem entre as duas | Agregado (raiz) | Não confundir com Dispositivo: o Alimentador é o que você configura; o Dispositivo é o ESP32 que executa. Por enquanto existe um só |
+| Alimentador | O comedouro como o servidor o enxerga: a configuração e a agenda de um aparelho, e as regras que valem entre as duas | Agregado (raiz) | Não confundir com Dispositivo: o Alimentador é o que você configura; o Dispositivo é o ESP32 que executa. Cada conta tem até 10. No código: `Feeder` |
 | Configuração | Os valores que dizem como o alimentador trabalha e que valem até alguém mudar: gramas por porção, limite diário, intervalo mínimo, limite da tigela, fuso, altura da garrafa e ângulos do servo | Value object, dentro do Alimentador | Não confundir com Comando: a configuração fica, o comando acontece uma vez. Mudar a configuração é trocá-la inteira por uma nova |
 | Versão da configuração | Número que sobe 1 a cada mudança aceita na configuração ou na agenda | Value object, dentro do Alimentador | O ESP32 devolve a versão que aplicou (sincronizado ou pendente), e o banco usa o número para perceber duas edições ao mesmo tempo |
 | Agenda | A lista de refeições agendadas, que se repete todos os dias. No máximo 8 | Value object, dentro do Alimentador | Não confundir com Horário: a agenda é a lista, e cada item é uma Refeição agendada. Vai junto com a configuração para o ESP32 |
@@ -40,6 +40,19 @@
 | Motivo de recusa | Por que o ESP32 não serviu: limite diário, intervalo ou tigela com ração | Value object (lista fechada) | Quem decide é o ESP32; o servidor só repassa (429). Não confundir com os erros de configuração (ex.: agenda cheia), que quem decide é o servidor. "Ocupado" e "offline" também não são motivos de recusa: são situações do dispositivo |
 | Histórico | A lista dos eventos do dispositivo, do mais recente para o mais antigo | Nenhum: é uma consulta sobre os eventos | Nem toda palavra do glossário vira peça do modelo |
 | Alerta | Situação que pede a sua atenção: garrafa abaixo de 20%, porção que não saiu (VAZIO), refeição pulada, sensor sem leitura, ESP32 reiniciado, alimentador offline há mais de 30 min | Entidade | Não confundir com Evento: o evento é o fato; o alerta é o que você precisa fazer a respeito. Nasce, é avisado uma vez e termina quando é reconhecido ou resolvido |
+
+### A conta e os aparelhos (desde a fase de produto)
+
+| Termo | Definição | Tipo | Observação |
+|---|---|---|---|
+| Usuário | Quem usa o app. Nasce no primeiro login com o Google | Agregado. No código: `User` | Identificado pelo `sub` do Google, que não muda; o e-mail pode mudar |
+| Sessão | O "estou logado" de um navegador: um token no cookie, que vale 30 dias e se renova com o uso | Registro (não é peça do domínio) | O banco guarda só o hash do token |
+| Perfil do comedouro | De quem é o comedouro, o apelido, o tipo (aparelho ou simulado) e quando foi pareado | Agregado. No código: `FeederProfile` | Separado do Alimentador de propósito: trocar o apelido não disputa versão com a agenda |
+| Apelido | O nome que a pessoa dá ao comedouro: "Cozinha". Aparece no título e nas frases | Campo do Perfil do comedouro | De 1 a 30 letras. Substituiu o "nome do gato" nas frases |
+| Pet | O cadastro de um bicho: nome, espécie, nascimento, peso e foto | Agregado. No código: `Pet` | Não tem ligação com o comedouro: o comedouro não sabe quem comeu |
+| Código de pareamento | Seis dígitos que ligam um aparelho a um comedouro. Vale 10 minutos e uma vez só | Entidade. No código: `PairingCode` | A pessoa vê no app e digita no portal Wi-Fi do ESP32 |
+| Pareamento | O ESP32 troca o código pela credencial do aparelho | Caso de uso | Parear de novo troca a senha e derruba o aparelho antigo |
+| Credencial do aparelho | O usuário e a senha MQTT de um comedouro. O usuário é o id do comedouro | Registro. No código: `DeviceCredential` | O banco guarda só o hash. Com ela, o aparelho só usa os tópicos do próprio comedouro |
 
 ## Agregados
 
