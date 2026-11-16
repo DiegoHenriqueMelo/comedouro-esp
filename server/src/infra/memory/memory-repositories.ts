@@ -13,13 +13,18 @@ import type {
   DeviceEventRepository,
   DeviceStatusRepository,
   FeederRepository,
+  IdentityVerifier,
   Notifier,
   PushSubscription,
   PushSubscriptionRepository,
+  Session,
+  SessionRepository,
+  UserRepository,
 } from "../../application/ports.js";
 import type { DeviceEvent, DeviceStatus } from "../../domain/device/device.js";
 import { Feeder } from "../../domain/feeder/feeder.js";
 import { ErroDeDominio } from "../../domain/shared/erro-de-dominio.js";
+import { type Identity, User } from "../../domain/user/user.js";
 
 // Adaptadores em memória: para os testes e para rodar sem banco (os dados somem ao reiniciar).
 
@@ -133,6 +138,62 @@ export class MemoryPushSubscriptionRepository
 
   async remove(endpoint: string): Promise<void> {
     this.byEndpoint.delete(endpoint);
+  }
+}
+
+export class MemoryUserRepository implements UserRepository {
+  private readonly byId = new Map<string, ReturnType<User["toProps"]>>();
+
+  async findById(id: string): Promise<User | null> {
+    const props = this.byId.get(id);
+    return props ? User.restore(props) : null;
+  }
+
+  async findByGoogleSub(sub: string): Promise<User | null> {
+    for (const props of this.byId.values()) {
+      if (props.googleSub === sub) return User.restore(props);
+    }
+    return null;
+  }
+
+  async save(user: User): Promise<void> {
+    this.byId.set(user.id, user.toProps());
+  }
+}
+
+export class MemorySessionRepository implements SessionRepository {
+  private readonly byHash = new Map<string, Session>();
+
+  async add(session: Session): Promise<void> {
+    this.byHash.set(session.tokenHash, { ...session });
+  }
+
+  async find(tokenHash: string): Promise<Session | null> {
+    const session = this.byHash.get(tokenHash);
+    return session ? { ...session } : null;
+  }
+
+  async update(session: Session): Promise<void> {
+    if (this.byHash.has(session.tokenHash)) {
+      this.byHash.set(session.tokenHash, { ...session });
+    }
+  }
+
+  async remove(tokenHash: string): Promise<void> {
+    this.byHash.delete(tokenHash);
+  }
+}
+
+// O "Google" dos testes: cada credencial cadastrada vale por uma identidade; o resto é recusado.
+export class FakeIdentityVerifier implements IdentityVerifier {
+  private readonly identities = new Map<string, Identity>();
+
+  accept(credential: string, identity: Identity): void {
+    this.identities.set(credential, identity);
+  }
+
+  async verify(credential: string): Promise<Identity | null> {
+    return this.identities.get(credential) ?? null;
   }
 }
 

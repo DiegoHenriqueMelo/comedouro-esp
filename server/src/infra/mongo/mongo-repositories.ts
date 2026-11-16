@@ -16,6 +16,9 @@ import type {
   FeederRepository,
   PushSubscription,
   PushSubscriptionRepository,
+  Session,
+  SessionRepository,
+  UserRepository,
 } from "../../application/ports.js";
 import type {
   DeviceEvent,
@@ -24,6 +27,7 @@ import type {
 } from "../../domain/device/device.js";
 import { Feeder } from "../../domain/feeder/feeder.js";
 import { ErroDeDominio } from "../../domain/shared/erro-de-dominio.js";
+import { User, type UserProps } from "../../domain/user/user.js";
 
 // Adaptadores do MongoDB. Cada repositório devolve objetos do domínio; o formato do documento não sai daqui.
 
@@ -279,5 +283,78 @@ export class MongoPushSubscriptionRepository
 
   async remove(endpoint: string): Promise<void> {
     await this.collection.deleteOne({ _id: endpoint });
+  }
+}
+
+type UserDoc = Omit<UserProps, "id"> & { _id: string };
+
+export class MongoUserRepository implements UserRepository {
+  private readonly collection: Collection<UserDoc>;
+
+  constructor(db: Db) {
+    this.collection = db.collection<UserDoc>("users");
+  }
+
+  async ensureIndexes(): Promise<void> {
+    await this.collection.createIndex({ googleSub: 1 }, { unique: true });
+  }
+
+  async findById(id: string): Promise<User | null> {
+    return toUser(await this.collection.findOne({ _id: id }));
+  }
+
+  async findByGoogleSub(sub: string): Promise<User | null> {
+    return toUser(await this.collection.findOne({ googleSub: sub }));
+  }
+
+  async save(user: User): Promise<void> {
+    const { id, ...rest } = user.toProps();
+    await this.collection.replaceOne({ _id: id }, rest, { upsert: true });
+  }
+}
+
+function toUser(doc: UserDoc | null): User | null {
+  if (!doc) return null;
+  const { _id, ...rest } = doc;
+  return User.restore({ id: _id, ...rest });
+}
+
+type SessionDoc = Omit<Session, "tokenHash"> & { _id: string };
+
+export class MongoSessionRepository implements SessionRepository {
+  private readonly collection: Collection<SessionDoc>;
+
+  constructor(db: Db) {
+    this.collection = db.collection<SessionDoc>("sessions");
+  }
+
+  async ensureIndexes(): Promise<void> {
+    // Índice TTL: o próprio Mongo apaga as sessões vencidas (confere mais ou menos a cada minuto).
+    await this.collection.createIndex(
+      { expiresAt: 1 },
+      { expireAfterSeconds: 0 },
+    );
+    await this.collection.createIndex({ userId: 1 });
+  }
+
+  async add(session: Session): Promise<void> {
+    const { tokenHash, ...rest } = session;
+    await this.collection.insertOne({ _id: tokenHash, ...rest });
+  }
+
+  async find(tokenHash: string): Promise<Session | null> {
+    const doc = await this.collection.findOne({ _id: tokenHash });
+    if (!doc) return null;
+    const { _id, ...rest } = doc;
+    return { tokenHash: _id, ...rest };
+  }
+
+  async update(session: Session): Promise<void> {
+    const { tokenHash, ...rest } = session;
+    await this.collection.replaceOne({ _id: tokenHash }, rest);
+  }
+
+  async remove(tokenHash: string): Promise<void> {
+    await this.collection.deleteOne({ _id: tokenHash });
   }
 }

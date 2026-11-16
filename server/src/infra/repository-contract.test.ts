@@ -7,15 +7,20 @@ import type {
   DeviceStatusRepository,
   FeederRepository,
   PushSubscriptionRepository,
+  SessionRepository,
+  UserRepository,
 } from "../application/ports.js";
 import type { DeviceEvent } from "../domain/device/device.js";
 import { Feeder } from "../domain/feeder/feeder.js";
+import { User } from "../domain/user/user.js";
 import {
   MemoryAlertRepository,
   MemoryDeviceEventRepository,
   MemoryDeviceStatusRepository,
   MemoryFeederRepository,
   MemoryPushSubscriptionRepository,
+  MemorySessionRepository,
+  MemoryUserRepository,
 } from "./memory/memory-repositories.js";
 import {
   MongoAlertRepository,
@@ -23,6 +28,8 @@ import {
   MongoDeviceStatusRepository,
   MongoFeederRepository,
   MongoPushSubscriptionRepository,
+  MongoSessionRepository,
+  MongoUserRepository,
 } from "./mongo/mongo-repositories.js";
 
 // A suíte de contrato: os mesmos testes rodam contra os repositórios em memória e contra os do MongoDB.
@@ -34,6 +41,8 @@ type Repositories = {
   status: DeviceStatusRepository;
   alerts: AlertRepository;
   subscriptions: PushSubscriptionRepository;
+  users: UserRepository;
+  sessions: SessionRepository;
 };
 
 const cafe = fromScheduleDto([{ hora: "07:30", porcoes: 2, ativo: true }]);
@@ -215,6 +224,58 @@ function contract(name: string, create: () => Promise<Repositories>) {
         expect(await r.subscriptions.list()).toEqual([]);
       });
     });
+
+    describe("usuários", () => {
+      const ana = {
+        sub: "google-ana",
+        email: "ana@example.com",
+        name: "Ana",
+        picture: null,
+      };
+
+      it("acha pelo id e pelo sub do Google; o que não existe devolve null", async () => {
+        const user = User.create("u1", ana, at(0));
+        await r.users.save(user);
+
+        expect((await r.users.findById("u1"))?.toProps()).toEqual(
+          user.toProps(),
+        );
+        expect((await r.users.findByGoogleSub("google-ana"))?.id).toBe("u1");
+        expect(await r.users.findById("u2")).toBeNull();
+        expect(await r.users.findByGoogleSub("google-bia")).toBeNull();
+      });
+
+      it("salvar de novo substitui", async () => {
+        const user = User.create("u1", ana, at(0));
+        await r.users.save(user);
+        user.updateFrom({ ...ana, name: "Ana Souza" });
+        await r.users.save(user);
+
+        expect((await r.users.findById("u1"))?.name).toBe("Ana Souza");
+      });
+    });
+
+    describe("sessões", () => {
+      const session = {
+        tokenHash: "hash-1",
+        userId: "u1",
+        expiresAt: at(30),
+        renewedAt: at(0),
+      };
+
+      it("guarda, acha, atualiza e remove", async () => {
+        await r.sessions.add(session);
+        expect(await r.sessions.find("hash-1")).toEqual(session);
+        expect(await r.sessions.find("hash-2")).toBeNull();
+
+        const renewed = { ...session, expiresAt: at(59), renewedAt: at(29) };
+        await r.sessions.update(renewed);
+        expect(await r.sessions.find("hash-1")).toEqual(renewed);
+
+        await r.sessions.remove("hash-1");
+        expect(await r.sessions.find("hash-1")).toBeNull();
+      });
+    });
   });
 }
 
@@ -224,6 +285,8 @@ contract("memória", async () => ({
   status: new MemoryDeviceStatusRepository(),
   alerts: new MemoryAlertRepository(),
   subscriptions: new MemoryPushSubscriptionRepository(),
+  users: new MemoryUserRepository(),
+  sessions: new MemorySessionRepository(),
 }));
 
 // Os testes do MongoDB precisam de um banco no ar: `docker compose up -d mongo` na raiz do repo.
@@ -268,6 +331,10 @@ describe.skipIf(!(await mongoIsUp()))("MongoDB", () => {
     const db = client.db(`${prefix}_${count}`);
     const events = new MongoDeviceEventRepository(db, "teste");
     await events.ensureIndexes();
+    const users = new MongoUserRepository(db);
+    await users.ensureIndexes();
+    const sessions = new MongoSessionRepository(db);
+    await sessions.ensureIndexes();
 
     return {
       feeders: new MongoFeederRepository(db, "teste"),
@@ -275,6 +342,8 @@ describe.skipIf(!(await mongoIsUp()))("MongoDB", () => {
       status: new MongoDeviceStatusRepository(db, "teste"),
       alerts: new MongoAlertRepository(db, "teste"),
       subscriptions: new MongoPushSubscriptionRepository(db),
+      users,
+      sessions,
     };
   });
 });

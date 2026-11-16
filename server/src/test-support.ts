@@ -1,6 +1,9 @@
-import { buildApp } from "./app.js";
+import type { InjectOptions } from "fastify";
+import { type AppOptions, buildApp } from "./app.js";
 import { buildSystem } from "./composition.js";
+import { SESSION_COOKIE } from "./http/auth-routes.js";
 import {
+  FakeIdentityVerifier,
   FixedClock,
   MemoryAlertRepository,
   MemoryDeviceEventRepository,
@@ -8,6 +11,8 @@ import {
   MemoryFeederRepository,
   MemoryNotifier,
   MemoryPushSubscriptionRepository,
+  MemorySessionRepository,
+  MemoryUserRepository,
 } from "./infra/memory/memory-repositories.js";
 import { InProcessDevice } from "./infra/simulated/in-process-device.js";
 import type { SimulatedDeviceOptions } from "./infra/simulated/simulated-device.js";
@@ -20,6 +25,7 @@ export async function buildTestSystem(
   options: {
     now?: Date;
     device?: Omit<SimulatedDeviceOptions, "clock" | "emitEvent">;
+    auth?: Partial<AppOptions["auth"]>;
   } = {},
 ) {
   const clock = new FixedClock(options.now ?? NOON);
@@ -28,6 +34,9 @@ export async function buildTestSystem(
   const subscriptions = new MemoryPushSubscriptionRepository();
   const feederRepository = new MemoryFeederRepository();
   const eventRepository = new MemoryDeviceEventRepository();
+  const google = new FakeIdentityVerifier();
+  const users = new MemoryUserRepository();
+  const sessions = new MemorySessionRepository();
 
   const system = buildSystem({
     feederRepository,
@@ -37,6 +46,9 @@ export async function buildTestSystem(
     device,
     notifier,
     clock,
+    users,
+    sessions,
+    identityVerifier: google,
   });
 
   system.devices.start();
@@ -47,7 +59,22 @@ export async function buildTestSystem(
     system,
     push: { publicKey: "chave-de-teste", subscriptions, notifier },
     simulator: device.simulated,
+    auth: {
+      googleClientId: "id-de-teste.apps.googleusercontent.com",
+      devLogin: false,
+      secureCookie: false,
+      ...options.auth,
+    },
   });
+
+  // Uma conta já logada: os testes de API usam `inject`, que manda o cookie dela.
+  const { token, user } = await system.auth.loginAs({
+    sub: "google-tutor",
+    email: "tutor@example.com",
+    name: "Tutor",
+    picture: null,
+  });
+  const cookie = `${SESSION_COOKIE}=${token}`;
 
   return {
     app,
@@ -59,6 +86,18 @@ export async function buildTestSystem(
     subscriptions,
     feederRepository,
     eventRepository,
+    google,
+    users,
+    sessions,
+    user,
+    cookie,
+    // Uma chamada à API como o usuário logado.
+    inject(request: InjectOptions) {
+      return app.inject({
+        ...request,
+        headers: { ...request.headers, cookie },
+      });
+    },
     // Avança o relógio e deixa o dispositivo rodar a agenda, minuto a minuto.
     async advance(minutes: number) {
       for (let i = 0; i < minutes; i++) {

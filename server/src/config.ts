@@ -12,6 +12,14 @@ const optionalPort = z.preprocess(
   z.coerce.number().int().min(1).max(65535).optional(),
 );
 
+const optionalBoolean = z.preprocess(
+  emptyAsUndefined,
+  z
+    .enum(["true", "false"])
+    .transform((v) => v === "true")
+    .optional(),
+);
+
 const schema = z.object({
   PORT: z.preprocess(emptyAsUndefined, z.coerce.number().int().default(3000)),
   HOST: z.preprocess(emptyAsUndefined, z.string().default("0.0.0.0")),
@@ -30,6 +38,13 @@ const schema = z.object({
   VAPID_SUBJECT: optional,
 
   WEB_DIST: optional,
+
+  NODE_ENV: optional,
+  GOOGLE_CLIENT_ID: optional,
+  // "true" ou "false". Sem valor: ligado fora de produção.
+  DEV_LOGIN: optionalBoolean,
+  // "true" ou "false". Sem valor: ligado só em produção (cookie só por HTTPS).
+  COOKIE_SECURE: optionalBoolean,
   SIM_CAT_EATS_MINUTES: z.preprocess(
     emptyAsUndefined,
     z.coerce.number().min(0).default(10),
@@ -67,6 +82,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
         }
       : null;
 
+  const production = e.NODE_ENV === "production";
+
   return {
     port: e.PORT,
     host: e.HOST,
@@ -78,5 +95,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
     vapid,
     webDist: resolve(e.WEB_DIST ?? "../web/dist"),
     simCatEatsMinutes: e.SIM_CAT_EATS_MINUTES,
+    auth: {
+      googleClientId: e.GOOGLE_CLIENT_ID ?? null,
+      devLogin: e.DEV_LOGIN ?? !production,
+      secureCookie: e.COOKIE_SECURE ?? production,
+    },
   };
 }

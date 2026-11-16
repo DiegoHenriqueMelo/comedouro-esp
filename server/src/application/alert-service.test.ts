@@ -9,7 +9,7 @@ async function openAlerts(t: TestSystem): Promise<string[]> {
 }
 
 async function simulate(t: TestSystem, payload: object) {
-  const res = await t.app.inject({
+  const res = await t.inject({
     method: "POST",
     url: "/v1/simulador",
     payload,
@@ -28,7 +28,7 @@ describe("alertas", () => {
 
   it("garrafa abaixo de 20% abre o alerta com os dias que faltam", async () => {
     const t = await buildTestSystem();
-    await t.app.inject({
+    await t.inject({
       method: "PUT",
       url: "/v1/schedules",
       payload: [{ hora: "07:30", porcoes: 5, ativo: true }],
@@ -80,7 +80,7 @@ describe("alertas", () => {
     const t = await buildTestSystem();
     expect(await openAlerts(t)).toEqual(["reiniciou"]);
 
-    const res = await t.app.inject({ method: "POST", url: "/v1/alerts/ack" });
+    const res = await t.inject({ method: "POST", url: "/v1/alerts/ack" });
 
     expect(res.statusCode).toBe(200);
     expect(await openAlerts(t)).toEqual([]);
@@ -155,13 +155,13 @@ describe("notificações push: inscrição", () => {
       keys: { p256dh: "chave", auth: "segredo" },
     };
 
-    const key = await t.app.inject({
+    const key = await t.inject({
       method: "GET",
       url: "/v1/push/public-key",
     });
     expect(key.json()).toEqual({ chave: "chave-de-teste" });
 
-    const added = await t.app.inject({
+    const added = await t.inject({
       method: "POST",
       url: "/v1/push/subscribe",
       payload: subscription,
@@ -169,7 +169,7 @@ describe("notificações push: inscrição", () => {
     expect(added.statusCode).toBe(201);
     expect(await t.subscriptions.list()).toEqual([subscription]);
 
-    await t.app.inject({
+    await t.inject({
       method: "POST",
       url: "/v1/push/unsubscribe",
       payload: { endpoint: subscription.endpoint },
@@ -180,7 +180,7 @@ describe("notificações push: inscrição", () => {
   it("inscrição sem as chaves devolve 400", async () => {
     const t = await buildTestSystem();
 
-    const res = await t.app.inject({
+    const res = await t.inject({
       method: "POST",
       url: "/v1/push/subscribe",
       payload: { endpoint: "https://push.example.com/abc" },

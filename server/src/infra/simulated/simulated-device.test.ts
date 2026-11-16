@@ -7,7 +7,7 @@ type TestSystem = Awaited<ReturnType<typeof buildTestSystem>>;
 const almoco = { hora: "12:30", porcoes: 2, ativo: true };
 
 async function setSchedule(t: TestSystem, agenda: object[]) {
-  const res = await t.app.inject({
+  const res = await t.inject({
     method: "PUT",
     url: "/v1/schedules",
     payload: agenda,
@@ -112,7 +112,7 @@ describe("dispositivo simulado: a agenda", () => {
     const t = await buildTestSystem();
     // A agenda (2 porções) cabe no limite de 10; o pedido manual de 9 é que estoura o dia.
     await setSchedule(t, [{ hora: "13:00", porcoes: 2, ativo: true }]);
-    await t.app.inject({
+    await t.inject({
       method: "POST",
       url: "/v1/feed",
       payload: { porcoes: 9 },
@@ -130,14 +130,14 @@ describe("dispositivo simulado: a agenda", () => {
 
   it("a virada da meia-noite zera o contador do dia", async () => {
     const t = await buildTestSystem();
-    await t.app.inject({
+    await t.inject({
       method: "POST",
       url: "/v1/feed",
       payload: { porcoes: 10 },
     });
 
     await t.advance(60);
-    const mesmoDia = await t.app.inject({
+    const mesmoDia = await t.inject({
       method: "POST",
       url: "/v1/feed",
       payload: {},
@@ -146,7 +146,7 @@ describe("dispositivo simulado: a agenda", () => {
 
     await t.advance(12 * 60); // passa da meia-noite
     t.simulated.setBowlGrams(0); // o gato comeu
-    const diaSeguinte = await t.app.inject({
+    const diaSeguinte = await t.inject({
       method: "POST",
       url: "/v1/feed",
       payload: {},
@@ -158,7 +158,7 @@ describe("dispositivo simulado: a agenda", () => {
     const t = await buildTestSystem();
     t.simulated.setBottleGrams(0);
 
-    const res = await t.app.inject({
+    const res = await t.inject({
       method: "POST",
       url: "/v1/feed",
       payload: {},
@@ -169,14 +169,14 @@ describe("dispositivo simulado: a agenda", () => {
     expect(await types(t)).toEqual(["reiniciou", "garrafa_vazia"]);
     expect(t.simulated.state().state).toBe("vazio");
 
-    const emVazio = await t.app.inject({
+    const emVazio = await t.inject({
       method: "POST",
       url: "/v1/feed",
       payload: {},
     });
     expect(emVazio.statusCode).toBe(409);
 
-    await t.app.inject({ method: "POST", url: "/v1/alerts/ack" });
+    await t.inject({ method: "POST", url: "/v1/alerts/ack" });
     await t.device.settled();
     expect(t.simulated.state().state).toBe("ocioso");
   });

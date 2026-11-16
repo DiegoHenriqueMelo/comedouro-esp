@@ -1,10 +1,18 @@
 import { existsSync } from "node:fs";
+import fastifyCookie from "@fastify/cookie";
 import fastifyStatic from "@fastify/static";
 import Fastify, { type FastifyBaseLogger } from "fastify";
 import { ZodError } from "zod";
 import type { SimulatorControls } from "./application/ports.js";
 import type { System } from "./composition.js";
 import { ErroDeDominio } from "./domain/shared/erro-de-dominio.js";
+import {
+  type AuthOptions,
+  registerAuthRoutes,
+  rejectForeignOrigin,
+  requireUser,
+  toUserDto,
+} from "./http/auth-routes.js";
 import { type PushDeps, registerRoutes } from "./http/routes.js";
 
 export type AppOptions = {
@@ -12,6 +20,7 @@ export type AppOptions = {
   loggerInstance?: FastifyBaseLogger;
   system: System;
   push: PushDeps;
+  auth: AuthOptions;
   // A pasta com o build do PWA (web/dist). Sem ela, o servidor só responde a API.
   webDist?: string | null;
   // O dispositivo simulado, quando o servidor roda sem ESP32: libera a rota /v1/simulador.
@@ -51,10 +60,33 @@ export function buildApp(options: AppOptions) {
     return reply.code(500).send({ motivo: "erro_interno" });
   });
 
+  app.register(fastifyCookie);
+  app.decorateRequest("user", null);
+  app.addHook("onRequest", rejectForeignOrigin);
+
   app.get("/health", async () => ({ status: "ok" }));
 
+  const { auth } = options.system;
   app.register(
-    registerRoutes(options.system, options.push, options.simulator ?? null),
+    async (v1) => {
+      // Abertas: login, sair e as opções da tela de login.
+      await v1.register(registerAuthRoutes(auth, options.auth));
+
+      // Todo o resto exige sessão.
+      await v1.register(async (privateScope) => {
+        privateScope.addHook("onRequest", requireUser(auth));
+        privateScope.get("/eu", async (request) =>
+          request.user ? toUserDto(request.user) : null,
+        );
+        await privateScope.register(
+          registerRoutes(
+            options.system,
+            options.push,
+            options.simulator ?? null,
+          ),
+        );
+      });
+    },
     { prefix: "/v1" },
   );
 

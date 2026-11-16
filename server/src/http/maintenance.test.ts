@@ -13,7 +13,7 @@ describe("API /v1: manutenção e conflito", () => {
   afterEach(() => t.app.close());
 
   const post = (url: string, payload?: object) =>
-    t.app.inject({ method: "POST", url, ...(payload ? { payload } : {}) });
+    t.inject({ method: "POST", url, ...(payload ? { payload } : {}) });
 
   it("tarar a balança zera a tigela", async () => {
     t.simulated.setBowlGrams(30);
@@ -50,7 +50,7 @@ describe("API /v1: manutenção e conflito", () => {
     expect(t.simulated.state().bowl.grams).toBe(120); // 20 porções de 6 g
 
     const status = (
-      await t.app.inject({ method: "GET", url: "/v1/status" })
+      await t.inject({ method: "GET", url: "/v1/status" })
     ).json();
     expect(status.hoje.porcoes).toBe(0);
   });
@@ -69,7 +69,7 @@ describe("API /v1: manutenção e conflito", () => {
       throw new ErroDeDominio("conflito_de_versao", "a versão salva é outra");
     };
 
-    const res = await t.app.inject({
+    const res = await t.inject({
       method: "PUT",
       url: "/v1/schedules",
       payload: [{ hora: "07:30", porcoes: 2, ativo: true }],

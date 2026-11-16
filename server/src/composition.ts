@@ -1,4 +1,5 @@
 import { AlertService } from "./application/alert-service.js";
+import { AuthService } from "./application/auth-service.js";
 import { DeviceService } from "./application/device-service.js";
 import { FeederService } from "./application/feeder-service.js";
 import type {
@@ -8,7 +9,10 @@ import type {
   DeviceEventRepository,
   DeviceStatusRepository,
   FeederRepository,
+  IdentityVerifier,
   Notifier,
+  SessionRepository,
+  UserRepository,
 } from "./application/ports.js";
 
 type Log = { warn(obj: unknown, msg: string): void };
@@ -21,6 +25,10 @@ export type SystemParts = {
   device: Device;
   notifier: Notifier;
   clock: Clock;
+  users: UserRepository;
+  sessions: SessionRepository;
+  // null quando o login com Google não foi configurado.
+  identityVerifier: IdentityVerifier | null;
   log?: Log;
 };
 
@@ -48,5 +56,12 @@ export function buildSystem(parts: SystemParts) {
     parts.clock,
   );
 
-  return { feeders, alerts, devices };
+  const auth = new AuthService(
+    parts.users,
+    parts.sessions,
+    parts.identityVerifier,
+    parts.clock,
+  );
+
+  return { feeders, alerts, devices, auth };
 }

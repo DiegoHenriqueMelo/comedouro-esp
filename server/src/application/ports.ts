@@ -6,6 +6,7 @@ import type {
   DeviceStatus,
 } from "../domain/device/device.js";
 import type { Feeder } from "../domain/feeder/feeder.js";
+import type { Identity, User } from "../domain/user/user.js";
 import type { ConfigPayload } from "./dto.js";
 
 // As portas: interfaces que a aplicação define e a infraestrutura implementa.
@@ -89,6 +90,34 @@ export interface PushSubscriptionRepository {
   add(subscription: PushSubscription): Promise<void>;
   list(): Promise<PushSubscription[]>;
   remove(endpoint: string): Promise<void>;
+}
+
+// Confere a credencial que o app recebeu do Google. Devolve null se ela for falsa, vencida ou de outro app.
+export interface IdentityVerifier {
+  verify(credential: string): Promise<Identity | null>;
+}
+
+export interface UserRepository {
+  findById(id: string): Promise<User | null>;
+  findByGoogleSub(sub: string): Promise<User | null>;
+  // Cria ou substitui.
+  save(user: User): Promise<void>;
+}
+
+// Uma sessão aberta. O token fica só no cookie do navegador; aqui fica o hash dele.
+export type Session = {
+  tokenHash: string;
+  userId: string;
+  expiresAt: Date;
+  renewedAt: Date;
+};
+
+export interface SessionRepository {
+  add(session: Session): Promise<void>;
+  // Devolve a sessão mesmo vencida: quem decide se ainda vale é o caso de uso.
+  find(tokenHash: string): Promise<Session | null>;
+  update(session: Session): Promise<void>;
+  remove(tokenHash: string): Promise<void>;
 }
 
 // O "mundo físico" do dispositivo simulado. Só existe no modo demonstração.

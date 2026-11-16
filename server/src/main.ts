@@ -9,16 +9,21 @@ import type {
   FeederRepository,
   Notifier,
   PushSubscriptionRepository,
+  SessionRepository,
+  UserRepository,
 } from "./application/ports.js";
 import { buildSystem } from "./composition.js";
 import { loadConfig } from "./config.js";
 import { loadEnvFiles } from "./env.js";
+import { GoogleIdentityVerifier } from "./infra/google/google-identity-verifier.js";
 import {
   MemoryAlertRepository,
   MemoryDeviceEventRepository,
   MemoryDeviceStatusRepository,
   MemoryFeederRepository,
   MemoryPushSubscriptionRepository,
+  MemorySessionRepository,
+  MemoryUserRepository,
   systemClock,
 } from "./infra/memory/memory-repositories.js";
 import {
@@ -27,6 +32,8 @@ import {
   MongoDeviceStatusRepository,
   MongoFeederRepository,
   MongoPushSubscriptionRepository,
+  MongoSessionRepository,
+  MongoUserRepository,
 } from "./infra/mongo/mongo-repositories.js";
 import {
   type EmbeddedBroker,
@@ -54,6 +61,8 @@ let eventRepository: DeviceEventRepository;
 let statusRepository: DeviceStatusRepository;
 let alertRepository: AlertRepository;
 let subscriptions: PushSubscriptionRepository;
+let users: UserRepository;
+let sessions: SessionRepository;
 
 if (config.mongo) {
   mongo = new MongoClient(config.mongo.url, { serverSelectionTimeoutMS: 8000 });
@@ -67,6 +76,12 @@ if (config.mongo) {
   statusRepository = new MongoDeviceStatusRepository(db, config.feederId);
   alertRepository = new MongoAlertRepository(db, config.feederId);
   subscriptions = new MongoPushSubscriptionRepository(db);
+  const mongoUsers = new MongoUserRepository(db);
+  await mongoUsers.ensureIndexes();
+  const mongoSessions = new MongoSessionRepository(db);
+  await mongoSessions.ensureIndexes();
+  users = mongoUsers;
+  sessions = mongoSessions;
   log.info({ db: config.mongo.db }, "banco: MongoDB");
 } else {
   feederRepository = new MemoryFeederRepository();
@@ -74,6 +89,8 @@ if (config.mongo) {
   statusRepository = new MemoryDeviceStatusRepository();
   alertRepository = new MemoryAlertRepository();
   subscriptions = new MemoryPushSubscriptionRepository();
+  users = new MemoryUserRepository();
+  sessions = new MemorySessionRepository();
   log.warn("banco: memória (sem MONGO_URL). Os dados somem ao reiniciar.");
 }
 
@@ -121,7 +138,16 @@ const notifier: Notifier = config.vapid
   : new LogNotifier(log);
 if (!config.vapid) log.warn("push: desligado (sem chaves VAPID).");
 
-// 4. Casos de uso e HTTP.
+// 4. Login: Google quando há GOOGLE_CLIENT_ID.
+const identityVerifier = config.auth.googleClientId
+  ? new GoogleIdentityVerifier(config.auth.googleClientId)
+  : null;
+if (!identityVerifier)
+  log.warn("login: sem GOOGLE_CLIENT_ID, o botão do Google não aparece.");
+if (config.auth.devLogin)
+  log.warn('login: "Entrar como dev" ligado (sem Google).');
+
+// 5. Casos de uso e HTTP.
 const system = buildSystem({
   feederRepository,
   eventRepository,
@@ -130,6 +156,9 @@ const system = buildSystem({
   device,
   notifier,
   clock,
+  users,
+  sessions,
+  identityVerifier,
   log,
 });
 
@@ -141,6 +170,7 @@ const app = buildApp({
     subscriptions,
     notifier,
   },
+  auth: config.auth,
   webDist: config.webDist,
   simulator: simulated?.simulated ?? null,
 });

@@ -8,6 +8,8 @@ import {
   MemoryDeviceStatusRepository,
   MemoryFeederRepository,
   MemoryNotifier,
+  MemorySessionRepository,
+  MemoryUserRepository,
 } from "../memory/memory-repositories.js";
 import { type EmbeddedBroker, startEmbeddedBroker } from "./embedded-broker.js";
 import { MqttDevice } from "./mqtt-device.js";
@@ -52,6 +54,9 @@ describe("MQTT: servidor, broker e dispositivo", () => {
       device,
       notifier: new MemoryNotifier(),
       clock,
+      users: new MemoryUserRepository(),
+      sessions: new MemorySessionRepository(),
+      identityVerifier: null,
     });
     system.devices.start();
   }
